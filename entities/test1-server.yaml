@@ -1,0 +1,22 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: test1
+  namespace: default
+  description: "Test MCP server"
+  labels:
+    mcp-catalog.io/type: server
+    mcp-catalog.io/category: demo
+  annotations:
+    mcp-catalog.io/version: "1.0.0"
+spec:
+  type: server
+  lifecycle: experimental
+  owner: platform-team
+  mcp:
+    serverType: stdio
+    endpoint: "docker run -i --rm ghcr.io/example/test1-server:latest"
+    version: "1.0.0"
+    capabilities:
+      - tools
+      - resources

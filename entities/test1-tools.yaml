@@ -1,0 +1,78 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: getinfo
+  namespace: default
+  description: "Read details from the Test1 MCP server"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: test1
+spec:
+  type: tool
+  lifecycle: experimental
+  owner: platform-team
+  mcp:
+    server: component:default/test1
+    toolType: query
+    inputSchema:
+      type: object
+      properties:
+        resourceId:
+          type: string
+          description: "Identifier of the entity to inspect"
+      required:
+        - resourceId
+    outputSchema:
+      type: object
+      properties:
+        metadata:
+          type: object
+    capabilities:
+      - read
+      - inspect
+relations:
+  - type: dependsOn
+    targetRef: component:default/test1
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: setinfo
+  namespace: default
+  description: "Update metadata on the Test1 MCP server"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: test1
+spec:
+  type: tool
+  lifecycle: experimental
+  owner: platform-team
+  mcp:
+    server: component:default/test1
+    toolType: mutation
+    inputSchema:
+      type: object
+      properties:
+        resourceId:
+          type: string
+          description: "Identifier of the record to update"
+        payload:
+          type: object
+          description: "JSON payload with the new values"
+      required:
+        - resourceId
+        - payload
+    outputSchema:
+      type: object
+      properties:
+        status:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    capabilities:
+      - write
+      - configure
+relations:
+  - type: dependsOn
+    targetRef: component:default/test1
