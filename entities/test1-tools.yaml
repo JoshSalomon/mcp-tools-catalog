@@ -11,6 +11,8 @@ spec:
   type: mcp-tool
   lifecycle: experimental
   owner: platform-team
+  dependsOn:
+    - component:default/test1
   mcp:
     server: component:default/test1
     toolType: query
@@ -30,9 +32,6 @@ spec:
     capabilities:
       - read
       - inspect
-relations:
-  - type: dependsOn
-    targetRef: component:default/test1
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
@@ -47,6 +46,8 @@ spec:
   type: mcp-tool
   lifecycle: experimental
   owner: platform-team
+  dependsOn:
+    - component:default/test1
   mcp:
     server: component:default/test1
     toolType: mutation
@@ -73,6 +74,3 @@ spec:
     capabilities:
       - write
       - configure
-relations:
-  - type: dependsOn
-    targetRef: component:default/test1
