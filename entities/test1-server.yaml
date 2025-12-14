@@ -10,7 +10,7 @@ metadata:
   annotations:
     mcp-catalog.io/version: "1.0.0"
 spec:
-  type: server
+  type: mcp-server
   lifecycle: experimental
   owner: platform-team
   mcp:

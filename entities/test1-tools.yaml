@@ -8,7 +8,7 @@ metadata:
     mcp-catalog.io/type: tool
     mcp-catalog.io/server: test1
 spec:
-  type: tool
+  type: mcp-tool
   lifecycle: experimental
   owner: platform-team
   mcp:
@@ -44,7 +44,7 @@ metadata:
     mcp-catalog.io/type: tool
     mcp-catalog.io/server: test1
 spec:
-  type: tool
+  type: mcp-tool
   lifecycle: experimental
   owner: platform-team
   mcp:
