@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-github-config
+  namespace: backstage
+data:
+  # Configure these values for your environment
+  GITHUB_ORG: "JoshSalomon"
+  GITHUB_REPO: "mcp-tools-catalog"
+  GITHUB_BRANCH: "001-mcp-tools-catalog"

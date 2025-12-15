@@ -1,0 +1,22 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: github-integration-server
+  namespace: default
+  description: "MCP server for GitHub API operations"
+  labels:
+    mcp-catalog.io/type: "server"
+    mcp-catalog.io/category: "api-integration"
+  annotations:
+    mcp-catalog.io/version: "1.0.0"
+spec:
+  type: server
+  lifecycle: production
+  owner: "group:platform-engineering"
+  mcp:
+    serverType: stdio
+    endpoint: "docker run -i --rm ghcr.io/github/github-mcp-server"
+    version: "1.0.0"
+    capabilities:
+      - tools
+      - resources

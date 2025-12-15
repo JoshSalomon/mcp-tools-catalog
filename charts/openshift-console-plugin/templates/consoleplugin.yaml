@@ -15,3 +15,37 @@ spec:
       namespace: {{ .Release.Namespace }}
       port: {{ .Values.plugin.port }}
       basePath: {{ .Values.plugin.basePath }}
+  {{- if or .Values.plugin.proxies .Values.plugin.backstage.enabled }}
+  proxy:
+    {{- if .Values.plugin.backstage.enabled }}
+    {{- if .Values.plugin.backstage.useRoute }}
+    - alias: backstage
+      endpoint:
+        type: Service
+        service:
+          name: {{ .Values.plugin.backstage.serviceName }}
+          namespace: {{ .Values.plugin.backstage.routeNamespace }}
+          port: {{ .Values.plugin.backstage.port }}
+      authorization: {{ .Values.plugin.backstage.authorization | default "UserToken" }}
+    {{- else }}
+    - alias: backstage
+      endpoint:
+        type: Service
+        service:
+          name: {{ .Values.plugin.backstage.serviceName }}
+          namespace: {{ .Values.plugin.backstage.namespace }}
+          port: {{ .Values.plugin.backstage.port }}
+      authorization: {{ .Values.plugin.backstage.authorization | default "UserToken" }}
+    {{- end }}
+    {{- end }}
+    {{- range .Values.plugin.proxies }}
+    - alias: {{ .alias }}
+      endpoint:
+        type: Service
+        service:
+          name: {{ .service.name }}
+          namespace: {{ .service.namespace }}
+          port: {{ .service.port }}
+      authorization: {{ .authorization | default "None" }}
+    {{- end }}
+  {{- end }}

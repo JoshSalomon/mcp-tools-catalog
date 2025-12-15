@@ -1,0 +1,414 @@
+# Backstage Catalog API Extensions for MCP Tools Catalog
+# OpenAPI 3.0 specification for MCP-specific catalog operations
+
+openapi: 3.0.3
+info:
+  title: MCP Tools Catalog API
+  description: Extended Backstage Catalog API for MCP entity management and relationships
+  version: 1.0.0
+  contact:
+    name: MCP Tools Catalog Team
+
+servers:
+  - url: /api/catalog
+    description: Backstage Catalog API
+
+paths:
+  # MCP Entity Endpoints
+  /entities:
+    get:
+      summary: Get MCP entities with filtering
+      description: Retrieve MCP entities (servers, tools, workloads) with optional filtering
+      parameters:
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+          examples:
+            mcp-servers: 
+              value: "kind=mcpserver"
+              summary: Get all MCP servers
+            tools-by-server:
+              value: "kind=mcptool,spec.server=mcpserver:default/github-server"
+              summary: Get tools for specific server
+            active-workloads:
+              value: "kind=mcpworkload,metadata.labels['mcp-catalog.io/status']=active"
+              summary: Get active workloads
+        - name: fields
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Comma-separated list of fields to include
+          example: "metadata.name,spec.type,spec.capabilities"
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 500
+      responses:
+        '200':
+          description: List of entities matching filter criteria
+          content:
+            application/json:
+              schema:
+                $ref: '../entity-schemas.yaml#/components/schemas/EntityListResponse'
+        '400':
+          description: Invalid filter parameters
+          content:
+            application/json:
+              schema:
+                $ref: '../entity-schemas.yaml#/components/schemas/ErrorResponse'
+
+  /entities/by-name/{kind}/{namespace}/{name}:
+    get:
+      summary: Get specific MCP entity by reference
+      description: Retrieve a specific MCP entity by kind, namespace, and name
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [mcpserver, mcptool, mcpworkload]
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+            default: default
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Entity details
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '../entity-schemas.yaml#/components/schemas/MCPServerEntity'
+                  - $ref: '../entity-schemas.yaml#/components/schemas/MCPToolEntity'
+                  - $ref: '../entity-schemas.yaml#/components/schemas/MCPWorkloadEntity'
+        '404':
+          description: Entity not found
+          content:
+            application/json:
+              schema:
+                $ref: '../entity-schemas.yaml#/components/schemas/ErrorResponse'
+
+  # MCP Relationship Endpoints
+  /entities/by-name/{kind}/{namespace}/{name}/relations:
+    get:
+      summary: Get entity relationships
+      description: Retrieve all relationships for a specific MCP entity
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [mcpserver, mcptool, mcpworkload]
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: direction
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [outbound, inbound, both]
+            default: both
+          description: Direction of relationships to include
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by relationship type
+      responses:
+        '200':
+          description: Entity relationships
+          content:
+            application/json:
+              schema:
+                $ref: '../entity-schemas.yaml#/components/schemas/EntityRelationshipResponse'
+
+  # MCP-Specific Query Endpoints
+  /mcp/servers/{serverName}/tools:
+    get:
+      summary: Get tools provided by MCP server
+      description: Retrieve all tools provided by a specific MCP server
+      parameters:
+        - name: serverName
+          in: path
+          required: true
+          schema:
+            type: string
+          description: MCP server name
+        - name: namespace
+          in: query
+          required: false
+          schema:
+            type: string
+            default: default
+      responses:
+        '200':
+          description: List of tools provided by the server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  server:
+                    $ref: '../entity-schemas.yaml#/components/schemas/MCPServerEntity'
+                  tools:
+                    type: array
+                    items:
+                      $ref: '../entity-schemas.yaml#/components/schemas/MCPToolEntity'
+        '404':
+          description: Server not found
+
+  /mcp/tools/{toolName}/workloads:
+    get:
+      summary: Get workloads using specific tool
+      description: Retrieve all workloads that reference a specific MCP tool
+      parameters:
+        - name: toolName
+          in: path
+          required: true
+          schema:
+            type: string
+          description: MCP tool name (server/tool format)
+        - name: namespace
+          in: query
+          required: false
+          schema:
+            type: string
+            default: default
+      responses:
+        '200':
+          description: List of workloads using the tool
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    $ref: '../entity-schemas.yaml#/components/schemas/MCPToolEntity'
+                  workloads:
+                    type: array
+                    items:
+                      $ref: '../entity-schemas.yaml#/components/schemas/MCPWorkloadEntity'
+
+  /mcp/workloads/{workloadName}/tools:
+    get:
+      summary: Get tools used by workload
+      description: Retrieve all tools referenced by a specific MCP workload
+      parameters:
+        - name: workloadName
+          in: path
+          required: true
+          schema:
+            type: string
+          description: MCP workload name
+        - name: namespace
+          in: query
+          required: false
+          schema:
+            type: string
+            default: default
+      responses:
+        '200':
+          description: List of tools used by the workload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workload:
+                    $ref: '../entity-schemas.yaml#/components/schemas/MCPWorkloadEntity'
+                  tools:
+                    type: array
+                    items:
+                      $ref: '../entity-schemas.yaml#/components/schemas/MCPToolEntity'
+
+  # Workload-Tool Relationship Management
+  /mcp/workloads/{workloadName}/tools/{toolReference}:
+    put:
+      summary: Add tool reference to workload
+      description: Add a tool reference to an existing MCP workload
+      parameters:
+        - name: workloadName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: toolReference
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Tool reference in format namespace/server/tool
+        - name: namespace
+          in: query
+          required: false
+          schema:
+            type: string
+            default: default
+      responses:
+        '200':
+          description: Tool reference added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Tool reference added to workload"
+                  workload:
+                    $ref: '../entity-schemas.yaml#/components/schemas/MCPWorkloadEntity'
+        '400':
+          description: Invalid tool reference
+        '404':
+          description: Workload or tool not found
+        '409':
+          description: Tool reference already exists
+
+    delete:
+      summary: Remove tool reference from workload
+      description: Remove a tool reference from an existing MCP workload
+      parameters:
+        - name: workloadName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: toolReference
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespace
+          in: query
+          required: false
+          schema:
+            type: string
+            default: default
+      responses:
+        '200':
+          description: Tool reference removed successfully
+        '404':
+          description: Workload, tool, or reference not found
+
+  # Health and Status Endpoints
+  /mcp/health:
+    get:
+      summary: Get MCP catalog health status
+      description: Health check for MCP catalog functionality
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                  entities:
+                    type: object
+                    properties:
+                      servers:
+                        type: integer
+                        description: Count of MCP servers
+                      tools:
+                        type: integer
+                        description: Count of MCP tools
+                      workloads:
+                        type: integer
+                        description: Count of MCP workloads
+                  lastUpdate:
+                    type: string
+                    format: date-time
+                  issues:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [broken-reference, validation-error, orphaned-entity]
+                        entity:
+                          type: string
+                        message:
+                          type: string
+
+  /mcp/validation:
+    post:
+      summary: Validate MCP entity relationships
+      description: Validate all MCP entity relationships and references
+      responses:
+        '200':
+          description: Validation results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        entity:
+                          type: string
+                        error:
+                          type: string
+                        severity:
+                          type: string
+                          enum: [error, warning]
+                  summary:
+                    type: object
+                    properties:
+                      totalEntities:
+                        type: integer
+                      validEntities:
+                        type: integer
+                      brokenReferences:
+                        type: integer
+                      orphanedEntities:
+                        type: integer
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Backstage authentication token
+
+security:
+  - BearerAuth: []

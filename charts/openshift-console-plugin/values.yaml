@@ -2,8 +2,8 @@
 plugin:
   name: ""
   description: ""
-  image: ""
-  imagePullPolicy: IfNotPresent
+  image: "quay.io/jsalomon/mcp-tools-catalog:latest"
+  imagePullPolicy: Always
   imagePullSecrets: []
   replicas: 2
   port: 9443
@@ -26,6 +26,25 @@ plugin:
       memory: 50Mi
   basePath: /
   certificateSecretName: ""
+  
+  # Configuration for Backstage Proxy
+  # NOTE: OpenShift console plugin proxy requires HTTPS for Service endpoints.
+  # Port 7443 expects a TLS-terminating sidecar in front of Backstage (port 7007).
+  # See DEPLOYMENT.md "Configure TLS for Console Plugin Integration" section.
+  backstage:
+    enabled: true
+    useRoute: false
+    serviceName: backstage
+    namespace: backstage
+    port: 7443
+    basePath: /
+    authorization: None
+
+  proxies: []
+
+  # Advanced: generic proxy list (if you need more than just Backstage)
+  proxies: []
+
   serviceAccount:
     create: true
     annotations: {}

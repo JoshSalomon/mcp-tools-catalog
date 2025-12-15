@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backstage-postgres
+  namespace: backstage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backstage-postgres
+  template:
+    metadata:
+      labels:
+        app: backstage-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: registry.redhat.io/rhel8/postgresql-13:latest
+          env:
+            - name: POSTGRESQL_USER
+              value: backstage
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-db
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRESQL_DATABASE
+              value: backstage
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 10
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backstage-postgres
+  namespace: backstage
+spec:
+  selector:
+    app: backstage-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+

@@ -3,18 +3,80 @@
     "type": "console.page/route",
     "properties": {
       "exact": true,
-      "path": "/example",
-      "component": { "$codeRef": "ExamplePage" }
+      "path": "/mcp-catalog",
+      "component": { "$codeRef": "McpCatalogPage" }
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/mcp-catalog/servers/:name",
+      "component": { "$codeRef": "McpServerPage" }
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/mcp-catalog/tools/:name",
+      "component": { "$codeRef": "McpToolPage" }
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/mcp-catalog/workloads/:name",
+      "component": { "$codeRef": "McpWorkloadPage" }
     }
   },
   {
     "type": "console.navigation/href",
     "properties": {
-      "id": "example",
-      "name": "%plugin__console-plugin-template~Plugin Example%",
-      "href": "/example",
+      "id": "mcp-catalog",
+      "name": "MCP Catalog",
+      "href": "/mcp-catalog",
       "perspective": "admin",
       "section": "home"
+    }
+  },
+  {
+    "type": "console.navigation/section",
+    "properties": {
+      "id": "mcp-tools",
+      "name": "MCP Tools",
+      "perspective": "admin"
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "mcp-servers",
+      "name": "Servers",
+      "href": "/mcp-catalog?type=server",
+      "perspective": "admin",
+      "section": "mcp-tools"
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "mcp-tools-list",
+      "name": "Tools",
+      "href": "/mcp-catalog?type=tool",
+      "perspective": "admin",
+      "section": "mcp-tools"
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "mcp-workloads",
+      "name": "Workloads",
+      "href": "/mcp-catalog?type=workload",
+      "perspective": "admin",
+      "section": "mcp-tools"
     }
   }
 ]

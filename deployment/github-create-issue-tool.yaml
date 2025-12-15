@@ -1,0 +1,42 @@
+piVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: create-issue
+  namespace: default
+  description: "Create a new GitHub issue with title and body"
+  labels:
+    mcp-catalog.io/type: "tool"
+    mcp-catalog.io/server: "github-integration-server"
+    mcp-catalog.io/category: "issue-management"
+spec:
+  type: tool
+  lifecycle: production
+  owner: "group:platform-engineering"
+  mcp:
+    server: "component:default/github-integration-server"
+    toolType: "api-call"
+    inputSchema:
+      type: object
+      properties:
+        title:
+          type: string
+          description: "Issue title"
+        body:
+          type: string
+          description: "Issue description"
+        labels:
+          type: array
+          items:
+            type: string
+      required:
+        - title
+    capabilities:
+      - create
+      - github-api
+    parameters:
+      - title
+      - body
+      - labels
+relations:
+  - type: dependsOn
+    targetRef: "component:default/github-integration-server"

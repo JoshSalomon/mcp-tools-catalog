@@ -1,234 +1,351 @@
-# OpenShift Console Plugin Template
+# MCP Tools Catalog
 
-This project is a minimal template for writing a new OpenShift Console dynamic
-plugin.
+A comprehensive Backstage plugin for managing Model Context Protocol (MCP) infrastructure, providing visibility into MCP servers, tools, and workloads within your organization.
 
-[Dynamic plugins](https://github.com/openshift/console/tree/master/frontend/packages/console-dynamic-plugin-sdk)
-allow you to extend the
-[OpenShift UI](https://github.com/openshift/console)
-at runtime, adding custom pages and other extensions. They are based on
-[webpack module federation](https://webpack.js.org/concepts/module-federation/).
-Plugins are registered with console using the `ConsolePlugin` custom resource
-and enabled in the console operator config by a cluster administrator.
+## 🎯 Project Overview
 
-Using the latest `v1` API version of `ConsolePlugin` CRD, requires OpenShift 4.12
-and higher. For using old `v1alpha1` API version us OpenShift version 4.10 or 4.11.
+The MCP Tools Catalog extends Backstage with three new entity types to provide complete visibility into your Model Context Protocol infrastructure:
 
-For an example of a plugin that works with OpenShift 4.11, see the `release-4.11` branch.
-For a plugin that works with OpenShift 4.10, see the `release-4.10` branch.
+- **🖥️ MCP Servers**: AI capability providers (e.g., GitHub API server, File system server)
+- **🔧 MCP Tools**: Individual AI functions (e.g., create-issue, read-file, analyze-text)  
+- **⚙️ MCP Workloads**: Composed workflows (e.g., Project setup automation, Content pipeline)
 
-[Node.js](https://nodejs.org/en/) and [yarn](https://yarnpkg.com) are required
-to build and run the example. To run OpenShift console in a container, either
-[Docker](https://www.docker.com) or [podman 3.2.0+](https://podman.io) and
-[oc](https://console.redhat.com/openshift/downloads) are required.
+## ✨ Features
 
-## Getting started
+- **🔍 Discovery**: Browse and discover MCP servers in your infrastructure
+- **🔗 Relationships**: Visualize connections between servers, tools, and workloads
+- **✅ Validation**: Automatic validation of entity relationships and references
+- **🚀 Integration**: Seamless integration with Backstage catalog and authentication
+- **📊 Management**: Manage workload-tool relationships through intuitive UI
+- **🏗️ Vanilla OpenShift Ready**: Works on upstream Backstage and standard OpenShift without proprietary extensions
 
-> [!IMPORTANT]  
-> To use this template, **DO NOT FORK THIS REPOSITORY**! Click **Use this template**, then select
-> [**Create a new repository**](https://github.com/new?template_name=networking-console-plugin&template_owner=openshift)
-> to create a new repository.
->
-> ![A screenshot showing where the "Use this template" button is located](https://i.imgur.com/AhaySbU.png)
->
-> **Forking this repository** for purposes outside of contributing to this repository
-> **will cause issues**, as users cannot have more than one fork of a template repository
-> at a time. This could prevent future users from forking and contributing to your plugin.
-> 
-> Your fork would also behave like a template repository, which might be confusing for
-> contributiors, because it is not possible for repositories generated from a template
-> repository to contribute back to the template.
+## 🧭 Constitution Alignment
 
-After cloning your instantiated repository, you must update the plugin metadata, such as the
-plugin name in the `consolePlugin` declaration of [package.json](package.json).
+- **Security-first**: Container images run as non-root, secrets stay out of Git, and deployment manifests include health checks and resource limits for defense in depth.
+- **Configuration-first**: Behavior is driven by Helm values, `console-extensions.json`, and `app-config` so features vary per environment without rebuilding the plugin.
+- **Backstage catalog-first**: MCP servers, tools, and workloads are modeled as standard Backstage Components, keeping entity discovery inside the existing catalog graph.
+- **Vanilla OpenShift platform target**: Charts, manifests, and console plugin definitions work unchanged on vanilla OpenShift clusters; Red Hat Developer Hub-specific features must include an upstream-safe fallback.
+- **TypeScript-first development**: The root `tsconfig.json` enforces `strict: true` and the codebase ships new logic in TypeScript instead of JavaScript shims. Run `npx tsc --noEmit` from the repo root and `npx tsc --noEmit -p tsconfig.check.json` from `plugins/mcp-tools-catalog` to keep both targets type-safe.
+- **Strict typing for Python tooling**: Any Python automation (e.g., helper scripts) must ship with Python 3.9+ type hints and pass `mypy --strict` before merge.
 
-```json
-"consolePlugin": {
-  "name": "console-plugin-template",
-  "version": "0.0.1",
-  "displayName": "My Plugin",
-  "description": "Enjoy this shiny, new console plugin!",
-  "exposedModules": {
-    "ExamplePage": "./components/ExamplePage"
-  },
-  "dependencies": {
-    "@console/pluginAPI": "*"
-  }
-}
+## 🏗️ Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   MCP Server    │    │    MCP Tool     │    │  MCP Workload   │
+│                 │    │                 │    │                 │
+│ • GitHub API    │───▶│ • create-issue  │◀───│ • Project Setup │
+│ • File System   │    │ • read-file     │    │ • Content Pipe  │
+│ • Database      │    │ • analyze-text  │    │ • Automation    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-The template adds a single example page in the Home navigation section. The
-extension is declared in the [console-extensions.json](console-extensions.json)
-file and the React component is declared in
-[src/components/ExamplePage.tsx](src/components/ExamplePage.tsx).
+**Relationships:**
+- 1 Server → N Tools (one-to-many)
+- N Tools ↔ M Workloads (many-to-many)
+- Automatic cascade operations and validation
 
-You can run the plugin using a local development environment or build an image
-to deploy it to a cluster.
+## 🚀 Quick Start
 
-## Development
+### Prerequisites
 
-### Option 1: Local
+- Backstage instance (v1.8+)
+- Node.js 18+
+- TypeScript 4.9+ with `strict` mode enabled
+- Vanilla OpenShift cluster (no proprietary console extensions required)
 
-In one terminal window, run:
+### Installation
 
-1. `yarn install`
-2. `yarn run start`
+1. **Install the plugin:**
+   ```bash
+   cd your-backstage-app
+   yarn add @internal/plugin-mcp-tools-catalog
+   ```
 
-In another terminal window, run:
+2. **Add to your Backstage app:**
+   ```typescript
+   // packages/app/src/App.tsx
+   import { McpCatalogPage } from '@internal/plugin-mcp-tools-catalog';
+   
+   <Route path="/mcp-catalog" element={<McpCatalogPage />} />
+   ```
 
-1. `oc login` (requires [oc](https://console.redhat.com/openshift/downloads) and an [OpenShift cluster](https://console.redhat.com/openshift/create))
-2. `yarn run start-console` (requires [Docker](https://www.docker.com) or [podman 3.2.0+](https://podman.io))
+3. **Register the entity processor:**
+   ```typescript
+   // packages/backend/src/plugins/catalog.ts
+   import { McpEntityProcessor } from '@internal/plugin-mcp-tools-catalog';
+   
+   builder.addProcessor(new McpEntityProcessor());
+   ```
 
-This will run the OpenShift console in a container connected to the cluster
-you've logged into. The plugin HTTP server runs on port 9001 with CORS enabled.
-Navigate to <http://localhost:9000/example> to see the running plugin.
+4. **Configure the plugin:**
+   ```yaml
+   # app-config.yaml
+   mcpCatalog:
+     enabled: true
+     ui:
+       showRelationshipGraphs: true
+   ```
 
-#### Running start-console with Apple silicon and podman
+### Register Your First MCP Server
 
-If you are using podman on a Mac with Apple silicon, `yarn run start-console`
-might fail since it runs an amd64 image. You can workaround the problem with
-[qemu-user-static](https://github.com/multiarch/qemu-user-static) by running
-these commands:
+Create `github-server.yaml`:
+```yaml
+apiVersion: mcp-catalog.io/v1alpha1
+kind: MCPServer
+metadata:
+  name: github-integration-server
+  description: "MCP server for GitHub API operations"
+spec:
+  type: stdio
+  endpoint: "docker run -i --rm ghcr.io/github/github-mcp-server"
+  version: "1.0.0"
+  capabilities: ["tools", "resources"]
+```
+
+Register in Backstage: **Create Component** → **Register Existing Component** → Upload YAML
+
+## 📁 Project Structure
+
+```
+mcp-tools-catalog/
+├── plugins/mcp-tools-catalog/          # Main Backstage plugin
+│   ├── src/
+│   │   ├── components/                 # React components
+│   │   ├── schemas/                   # Entity type definitions
+│   │   ├── api/                       # API client and interfaces
+│   │   ├── services/                  # Business logic
+│   │   ├── processors/                # Backstage processors
+│   │   └── utils/                     # Utilities and validation
+│   ├── package.json
+│   └── README.md
+├── charts/mcp-tools-catalog/          # Helm charts for deployment
+│   ├── templates/
+│   └── values.yaml
+├── integration-tests/                 # End-to-end tests
+│   ├── tests/
+│   └── cypress.config.js
+├── specs/001-mcp-tools-catalog/       # Design documentation
+│   ├── plan.md
+│   ├── spec.md
+│   ├── data-model.md
+│   └── quickstart.md
+└── README.md                          # This file
+```
+
+## 🧪 Development & Testing
+
+### Local Development
 
 ```bash
-podman machine ssh
-sudo -i
-rpm-ostree install qemu-user-static
-systemctl reboot
+# Clone repository
+git clone <repository-url>
+cd mcp-tools-catalog
+
+# Install dependencies
+yarn install
+
+# Build plugin
+cd plugins/mcp-tools-catalog
+yarn build
+
+# Run tests
+yarn test
+
+# Start development server
+yarn dev
 ```
 
-### Option 2: Docker + VSCode Remote Container
-
-Make sure the
-[Remote Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-extension is installed. This method uses Docker Compose where one container is
-the OpenShift console and the second container is the plugin. It requires that
-you have access to an existing OpenShift cluster. After the initial build, the
-cached containers will help you start developing in seconds.
-
-1. Create a `dev.env` file inside the `.devcontainer` folder with the correct values for your cluster:
+### Testing
 
 ```bash
-OC_PLUGIN_NAME=console-plugin-template
-OC_URL=https://api.example.com:6443
-OC_USER=kubeadmin
-OC_PASS=<password>
+# Unit tests
+yarn test
+
+# Integration tests
+cd integration-tests
+yarn cypress:run
+
+# Lint and format
+yarn lint
 ```
 
-2. `(Ctrl+Shift+P) => Remote Containers: Open Folder in Container...`
-3. `yarn run start`
-4. Navigate to <http://localhost:9000/example>
+### Manual Testing Scenarios
 
-## Docker image
+1. **Entity Registration:**
+   - Register MCP server, verify it appears in catalog
+   - Add tools linked to server, verify relationships
+   - Create workload referencing tools, test navigation
 
-Before you can deploy your plugin on a cluster, you must build an image and
-push it to an image registry.
+2. **Relationship Management:**
+   - Navigate from server → tools → workloads
+   - Test bidirectional relationship display
+   - Verify cascade delete behavior
 
-1. Build the image:
+3. **Search & Filtering:**
+   - Filter by entity type (servers/tools/workloads)
+   - Search by name, description, labels
+   - Test advanced filtering combinations
 
-   ```sh
-   docker build -t quay.io/my-repository/my-plugin:latest .
+4. **Error Handling:**
+   - Test broken entity references
+   - Validate error messages and recovery
+   - Test validation endpoint responses
+
+## 🏭 Deployment
+
+### Vanilla OpenShift Deployment
+
+> These steps are validated against a vanilla OpenShift Container Platform cluster with upstream Backstage distributions. If you enable any Red Hat Developer Hub–specific features, document a fallback that keeps the plugin functional on vanilla clusters.
+
+> **Deploying Backstage itself?** See the comprehensive [Deployment Guide (DEPLOYMENT.md)](DEPLOYMENT.md#-deploying-upstream-backstage-on-openshift) for instructions on deploying upstream Backstage to OpenShift, including the required Dockerfile patches for OpenShift's Security Context Constraints.
+
+1. **Build and push container:**
+   ```bash
+   docker build -t registry.example.com/mcp-tools-catalog:latest .
+   docker push registry.example.com/mcp-tools-catalog:latest
    ```
 
-2. Run the image:
-
-   ```sh
-   docker run -it --rm -d -p 9001:80 quay.io/my-repository/my-plugin:latest
+2. **Deploy with Helm:**
+   ```bash
+   helm install mcp-catalog charts/mcp-tools-catalog/ \
+     --set image.repository=registry.example.com/mcp-tools-catalog \
+     --set image.tag=latest \
+     --set openshift.enabled=true
    ```
 
-3. Push the image:
-
-   ```sh
-   docker push quay.io/my-repository/my-plugin:latest
+3. **Configure environment:**
+   ```yaml
+   # app-config.production.yaml
+   mcpCatalog:
+     integrations:
+       openshift:
+         enabled: true
+         baseUrl: ${OPENSHIFT_API_URL}
+         namespace: mcp-tools
    ```
 
-NOTE: If you have a Mac with Apple silicon, you will need to add the flag
-`--platform=linux/amd64` when building the image to target the correct platform
-to run in-cluster.
+### Environment Variables
 
-## Deployment on cluster
+```bash
+# Required
+OPENSHIFT_API_URL=https://api.openshift.example.com
+OPENSHIFT_NAMESPACE=mcp-tools
+OPENSHIFT_TOKEN=${OPENSHIFT_SERVICE_ACCOUNT_TOKEN}
 
-A [Helm](https://helm.sh) chart is available to deploy the plugin to an OpenShift environment.
-
-The following Helm parameters are required:
-
-`plugin.image`: The location of the image containing the plugin that was previously pushed
-
-Additional parameters can be specified if desired. Consult the chart [values](charts/openshift-console-plugin/values.yaml) file for the full set of supported parameters.
-
-### Installing the Helm Chart
-
-Install the chart using the name of the plugin as the Helm release name into a new namespace or an existing namespace as specified by the `plugin_console-plugin-template` parameter and providing the location of the image within the `plugin.image` parameter by using the following command:
-
-```shell
-helm upgrade -i  my-plugin charts/openshift-console-plugin -n my-namespace --create-namespace --set plugin.image=my-plugin-image-location
+# Optional
+MCP_REGISTRY_API_KEY=${MCP_REGISTRY_API_KEY}
 ```
 
-NOTE: When deploying on OpenShift 4.10, it is recommended to add the parameter `--set plugin.securityContext.enabled=false` which will omit configurations related to Pod Security.
+## 📚 Documentation
 
-NOTE: When defining i18n namespace, adhere `plugin__<name-of-the-plugin>` format. The name of the plugin should be extracted from the `consolePlugin` declaration within the [package.json](package.json) file.
+- **[Plugin README](plugins/mcp-tools-catalog/README.md)**: Detailed plugin documentation
+- **[Quickstart Guide](specs/001-mcp-tools-catalog/quickstart.md)**: Step-by-step usage examples
+- **[Data Model](specs/001-mcp-tools-catalog/data-model.md)**: Entity schemas and relationships
+- **[API Contracts](specs/001-mcp-tools-catalog/contracts/)**: OpenAPI specifications
+- **[Implementation Plan](specs/001-mcp-tools-catalog/plan.md)**: Technical architecture
+- **[Feature Spec](specs/001-mcp-tools-catalog/spec.md)**: User stories and requirements
 
-## i18n
+## 🎯 Roadmap
 
-The plugin template demonstrates how you can translate messages in with [react-i18next](https://react.i18next.com/). The i18n namespace must match
-the name of the `ConsolePlugin` resource with the `plugin__` prefix to avoid
-naming conflicts. For example, the plugin template uses the
-`plugin__console-plugin-template` namespace. You can use the `useTranslation` hook
-with this namespace as follows:
+### ✅ Phase 1: MVP (User Story 1)
+- [x] Browse and discover MCP servers
+- [x] Server detail pages with metadata
+- [x] Basic search and filtering
 
-```tsx
-conster Header: React.FC = () => {
-  const { t } = useTranslation('plugin__console-plugin-template');
-  return <h1>{t('Hello, World!')}</h1>;
-};
+### 🚧 Phase 2: Tools (User Story 2)
+- [ ] Browse MCP tools with server relationships
+- [ ] Tool detail pages with parameter schemas
+- [ ] Tool-to-server navigation
+
+### 📋 Phase 3: Workloads (User Story 3)
+- [ ] Manage MCP workloads and tool dependencies
+- [ ] Workload composition visualization
+- [ ] Tool-workload relationship management UI
+
+### 🔮 Future Enhancements
+- [ ] Real-time MCP server health monitoring
+- [ ] Automatic MCP server discovery
+- [ ] Advanced dependency visualization
+- [ ] Workflow orchestration integration
+- [ ] Performance metrics and analytics
+
+## 📝 TODO
+
+### Authentication Support
+
+**Current State**: The OpenShift console plugin communicates with the Backstage catalog API through the console's built-in proxy. Currently, authentication is disabled on the Backstage backend using `dangerouslyDisableDefaultAuthPolicy: true` in `app-config.production.yaml`. This is a **development/testing workaround** and is **not suitable for production**.
+
+**What Needs to Be Implemented**:
+1. **Service-to-service authentication**: Configure a static token or service account that the console plugin proxy can use to authenticate with the Backstage backend.
+2. **Token injection in proxy config**: Update the Helm chart's `ConsolePlugin` proxy configuration to include an `Authorization` header with a bearer token.
+3. **Backstage backend token validation**: Configure Backstage to accept and validate the service token for catalog API requests.
+
+**Possible Approaches**:
+- **Static backend token**: Generate a `BACKEND_SECRET` in Backstage and configure the console plugin proxy to send it as a bearer token.
+- **Kubernetes service account**: Use OpenShift's built-in service account tokens with Backstage's Kubernetes auth provider.
+- **OAuth/OIDC integration**: Integrate with OpenShift's OAuth server for user-based authentication (more complex, supports per-user permissions).
+
+**References**:
+- [Backstage Auth Documentation](https://backstage.io/docs/auth/)
+- [Backstage Backend-to-Backend Auth](https://backstage.io/docs/auth/service-to-service-auth)
+- [OpenShift Console Plugin Proxy](https://docs.openshift.com/container-platform/latest/web_console/dynamic-plugin-development.html)
+
+## 🤝 Contributing
+
+1. **Fork** the repository
+2. **Create** a feature branch: `git checkout -b feature/your-feature`
+3. **Follow** our coding standards and add tests
+4. **Run** linting: `yarn lint`
+5. **Submit** a pull request
+
+### Coding Standards
+
+- TypeScript-first with `tsconfig.json` enforcing `strict: true` (no new JavaScript entry points); use `npx tsc --noEmit` at the root and `npx tsc --noEmit -p tsconfig.check.json` inside `plugins/mcp-tools-catalog`
+- ESLint + Prettier for formatting
+- Jest for unit testing
+- Cypress for integration testing
+- Python automation/tooling must include type hints and pass `mypy --strict`
+- Backstage conventions for plugin development
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Entity not appearing | Check YAML syntax, verify entity processor registration |
+| Broken relationships | Validate EntityRef format, ensure target entities exist |
+| Plugin not loading | Verify imports in App.tsx, check browser console |
+| API errors | Check authentication, validate request format |
+
+### Debug Mode
+
+```yaml
+# Enable debug logging
+backend:
+  logger:
+    level: debug
 ```
 
-For labels in `console-extensions.json`, you can use the format
-`%plugin__console-plugin-template~My Label%`. Console will replace the value with
-the message for the current language from the `plugin__console-plugin-template`
-namespace. For example:
+### Support Resources
 
-```json
-  {
-    "type": "console.navigation/section",
-    "properties": {
-      "id": "admin-demo-section",
-      "perspective": "admin",
-      "name": "%plugin__console-plugin-template~Plugin Template%"
-    }
-  }
-```
+- 📖 [Backstage Documentation](https://backstage.io/docs)
+- 🔗 [MCP Protocol Spec](https://spec.modelcontextprotocol.io/)
+- 🐛 [Issue Tracker](https://github.com/your-org/mcp-tools-catalog/issues)
+- 💬 [Discussions](https://github.com/your-org/mcp-tools-catalog/discussions)
 
-Running `yarn i18n` updates the JSON files in the `locales` folder of the
-plugin template when adding or changing messages.
+## 📄 License
 
-## Linting
+Apache 2.0 - See [LICENSE](LICENSE) file for details.
 
-This project adds prettier, eslint, and stylelint. Linting can be run with
-`yarn run lint`.
+## 🙏 Acknowledgments
 
-The stylelint config disallows hex colors since these cause problems with dark
-mode (starting in OpenShift console 4.11). You should use the
-[PatternFly global CSS variables](https://patternfly-react-main.surge.sh/developer-resources/global-css-variables#global-css-variables)
-for colors instead.
+- [Backstage](https://backstage.io/) for the amazing developer portal platform
+- [Model Context Protocol](https://modelcontextprotocol.io/) for the AI tooling standard
+- [OpenShift](https://openshift.com/) for enterprise Kubernetes platform
+- The open source community for continuous inspiration
 
-The stylelint config also disallows naked element selectors like `table` and
-`.pf-` or `.co-` prefixed classes. This prevents plugins from accidentally
-overwriting default console styles, breaking the layout of existing pages. The
-best practice is to prefix your CSS classnames with your plugin name to avoid
-conflicts. Please don't disable these rules without understanding how they can
-break console styles!
+---
 
-## Reporting
-
-Steps to generate reports
-
-1. In command prompt, navigate to root folder and execute the command `yarn run cypress-merge`
-2. Then execute command `yarn run cypress-generate`
-The cypress-report.html file is generated and should be in (/integration-tests/screenshots) directory
-
-## References
-
-- [Console Plugin SDK README](https://github.com/openshift/console/tree/master/frontend/packages/console-dynamic-plugin-sdk)
-- [Customization Plugin Example](https://github.com/spadgett/console-customization-plugin)
-- [Dynamic Plugin Enhancement Proposal](https://github.com/openshift/enhancements/blob/master/enhancements/console/dynamic-plugins.md)
+**Ready to explore your MCP infrastructure?** 🚀 [Get started with the quickstart guide!](specs/001-mcp-tools-catalog/quickstart.md)

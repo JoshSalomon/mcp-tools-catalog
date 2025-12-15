@@ -1,0 +1,28 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: new-project-setup
+  namespace: default
+  description: "Automated new project initialization workflow"
+  labels:
+    mcp-catalog.io/type: "workload"
+    mcp-catalog.io/category: "automation"
+    mcp-catalog.io/status: "active"
+spec:
+  type: workload
+  lifecycle: production
+  owner: "group:platform-engineering"
+  mcp:
+    workloadType: "workflow"
+    purpose: "Streamline new project creation with automated repository setup and initial issues"
+    tools:
+      - "component:default/create-issue"
+    deploymentInfo:
+      schedule: "on-demand"
+      runtime: "nodejs"
+      environment: "development"
+    dependencies:
+      - "GitHub API access"
+relations:
+  - type: dependsOn
+    targetRef: "component:default/create-issue"
