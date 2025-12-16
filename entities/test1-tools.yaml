@@ -11,9 +11,8 @@ spec:
   type: mcp-tool
   lifecycle: experimental
   owner: platform-team
-  # partOf establishes the tool-to-server relationship
-  partOf:
-    - component:default/test1
+  # partOf establishes the tool-to-server relationship (single string, not array)
+  partOf: component:default/test1
   mcp:
     toolType: query
     inputSchema:
@@ -46,9 +45,8 @@ spec:
   type: mcp-tool
   lifecycle: experimental
   owner: platform-team
-  # partOf establishes the tool-to-server relationship
-  partOf:
-    - component:default/test1
+  # partOf establishes the tool-to-server relationship (single string, not array)
+  partOf: component:default/test1
   mcp:
     toolType: mutation
     inputSchema:
