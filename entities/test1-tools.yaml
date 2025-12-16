@@ -11,10 +11,10 @@ spec:
   type: mcp-tool
   lifecycle: experimental
   owner: platform-team
-  dependsOn:
+  # partOf establishes the tool-to-server relationship
+  partOf:
     - component:default/test1
   mcp:
-    server: component:default/test1
     toolType: query
     inputSchema:
       type: object
@@ -46,10 +46,10 @@ spec:
   type: mcp-tool
   lifecycle: experimental
   owner: platform-team
-  dependsOn:
+  # partOf establishes the tool-to-server relationship
+  partOf:
     - component:default/test1
   mcp:
-    server: component:default/test1
     toolType: mutation
     inputSchema:
       type: object
