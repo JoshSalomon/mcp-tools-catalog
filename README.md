@@ -33,17 +33,18 @@ The MCP Tools Catalog extends Backstage with three new entity types to provide c
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   MCP Server    │    │    MCP Tool     │    │  MCP Workload   │
+│  (Component)    │    │  (Component)    │    │  (Component)    │
+│ spec.type:      │    │ spec.type:      │    │ spec.type:      │
+│  mcp-server     │◀───│  mcp-tool       │◀───│  service        │
 │                 │    │                 │    │                 │
-│ • GitHub API    │───▶│ • create-issue  │◀───│ • Project Setup │
-│ • File System   │    │ • read-file     │    │ • Content Pipe  │
-│ • Database      │    │ • analyze-text  │    │ • Automation    │
+│ hasPart ────────┼───▶│ subcomponentOf  │    │ dependsOn ──────┤
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-**Relationships:**
-- 1 Server → N Tools (one-to-many)
-- N Tools ↔ M Workloads (many-to-many)
-- Automatic cascade operations and validation
+**Relationships (Standard Backstage):**
+- **Tool → Server**: `spec.subcomponentOf` creates `partOf`/`hasPart` relations
+- **Workload → Tool**: `spec.dependsOn` creates `dependsOn`/`dependencyOf` relations
+- All entities are standard Backstage `Component` kind with custom `spec.type` values
 
 ## 🚀 Quick Start
 
@@ -91,19 +92,28 @@ The MCP Tools Catalog extends Backstage with three new entity types to provide c
 
 Create `github-server.yaml`:
 ```yaml
-apiVersion: mcp-catalog.io/v1alpha1
-kind: MCPServer
+apiVersion: backstage.io/v1alpha1
+kind: Component
 metadata:
   name: github-integration-server
+  namespace: default
   description: "MCP server for GitHub API operations"
+  labels:
+    mcp-catalog.io/type: server
 spec:
-  type: stdio
-  endpoint: "docker run -i --rm ghcr.io/github/github-mcp-server"
-  version: "1.0.0"
-  capabilities: ["tools", "resources"]
+  type: mcp-server
+  lifecycle: production
+  owner: platform-team
+  mcp:
+    serverType: stdio
+    endpoint: "docker run -i --rm ghcr.io/github/github-mcp-server"
+    version: "1.0.0"
+    capabilities:
+      - tools
+      - resources
 ```
 
-Register in Backstage: **Create Component** → **Register Existing Component** → Upload YAML
+Register: Push to your GitHub catalog repository and wait for Backstage to sync.
 
 ## 📁 Project Structure
 
@@ -248,20 +258,47 @@ MCP_REGISTRY_API_KEY=${MCP_REGISTRY_API_KEY}
 
 ## 🎯 Roadmap
 
-### ✅ Phase 1: MVP (User Story 1)
+### ✅ Phase 1: Setup & Foundation
+- [x] Project initialization and basic structure
+- [x] TypeScript models for MCP entities
+- [x] Core services (catalog, search, validation)
+- [x] Shared components (Pagination, OfflineIndicator)
+
+### ✅ Phase 2: Browse MCP Servers (User Story 1)
 - [x] Browse and discover MCP servers
 - [x] Server detail pages with metadata
+- [x] Tool list on server pages with clickable links
 - [x] Basic search and filtering
+- [x] Performance monitoring
 
-### 🚧 Phase 2: Tools (User Story 2)
-- [ ] Browse MCP tools with server relationships
-- [ ] Tool detail pages with parameter schemas
-- [ ] Tool-to-server navigation
+### ✅ Phase 3: Explore MCP Tools (User Story 2)
+- [x] Browse MCP tools with server relationships
+- [x] Tool detail pages with parameter schemas
+- [x] Tool-to-server navigation (subcomponentOf/partOf relations)
+- [x] "Used By" workloads section
+- [x] Hierarchical naming (server/tool format)
+- [x] Validation for broken server references
 
-### 📋 Phase 3: Workloads (User Story 3)
-- [ ] Manage MCP workloads and tool dependencies
-- [ ] Workload composition visualization
-- [ ] Tool-workload relationship management UI
+### ✅ Phase 4: Manage MCP Workloads (User Story 3)
+- [x] Browse MCP workloads with tool dependencies
+- [x] Workload detail pages with deployment info
+- [x] Tools grouped by server (expandable sections)
+- [x] Dependency tree view (hierarchical visualization)
+- [x] Filter workloads by tool
+- [x] Validation for broken tool references
+
+### ✅ Phase 5: GitHub Catalog Integration (User Story 4)
+- [x] Documentation for GitHub repository configuration
+- [x] Branch and PAT setup instructions
+- [x] Source of truth behavior (GitHub overwrites Backstage)
+- [x] Automatic sync and retry mechanisms
+
+### 📋 Phase 6: Polish & Production Readiness
+- [ ] Unit tests for all components
+- [ ] Integration tests (Cypress)
+- [ ] Loading states and error boundaries
+- [ ] Breadcrumb navigation
+- [ ] Accessibility improvements (ARIA labels, keyboard nav)
 
 ### 🔮 Future Enhancements
 - [ ] Real-time MCP server health monitoring

@@ -95,7 +95,7 @@ Backstage plugin structure:
 
 ---
 
-## Phase 4: User Story 2 - Explore MCP Tools (Priority: P2)
+## Phase 4: User Story 2 - Explore MCP Tools (Priority: P2) ✅ COMPLETE
 
 **Goal**: Developers can browse MCP tools, see which server provides each tool, and navigate from tools to servers and workloads
 
@@ -103,24 +103,24 @@ Backstage plugin structure:
 
 ### Implementation for User Story 2
 
-- [ ] T034 [P] [US2] Create ToolsTab.tsx in src/components/ with PatternFly table showing tool list, search, and filter
-- [ ] T035 [P] [US2] Create McpToolPage.tsx in src/components/ displaying tool properties (name, description, type, parameters) per FR-003
-- [ ] T036 [US2] Add parent server section to McpToolPage.tsx with clickable link to server detail page per FR-003
-- [ ] T037 [US2] Add "Used By" workloads section to McpToolPage.tsx showing bidirectional relationships per FR-004
-- [ ] T038 [US2] Integrate catalogService in ToolsTab.tsx to fetch MCP tool entities with filter kind=Component AND spec.type=tool
-- [ ] T039 [US2] Integrate catalogService in McpToolPage.tsx to fetch tool details, parent server, and referencing workloads
-- [ ] T040 [US2] Add pagination to ToolsTab.tsx using shared Pagination component (100 items/page)
-- [ ] T041 [US2] Implement text search and relationship filters (tools by server) in ToolsTab.tsx per FR-008
-- [ ] T042 [US2] Add performance monitoring to ToolsTab.tsx and McpToolPage.tsx using performanceMonitor utility
-- [ ] T043 [US2] Add ToolsTab to McpCatalogPage.tsx tabs
-- [ ] T044 [US2] Implement hierarchical naming display in McpToolPage.tsx using hierarchicalNaming utility (server/tool format)
-- [ ] T045 [US2] Add validation error display in McpToolPage.tsx for broken server references using validationService
+- [x] T034 [P] [US2] Create ToolsTab.tsx in src/components/ with PatternFly table showing tool list, search, and filter
+- [x] T035 [P] [US2] Create McpToolPage.tsx in src/components/ displaying tool properties (name, description, type, parameters) per FR-003
+- [x] T036 [US2] Add parent server section to McpToolPage.tsx with clickable link to server detail page per FR-003
+- [x] T037 [US2] Add "Used By" workloads section to McpToolPage.tsx showing bidirectional relationships per FR-004
+- [x] T038 [US2] Integrate catalogService in ToolsTab.tsx to fetch MCP tool entities with filter kind=Component AND spec.type=tool
+- [x] T039 [US2] Integrate catalogService in McpToolPage.tsx to fetch tool details, parent server, and referencing workloads
+- [x] T040 [US2] Add pagination to ToolsTab.tsx using shared Pagination component (100 items/page)
+- [x] T041 [US2] Implement text search and relationship filters (tools by server) in ToolsTab.tsx per FR-008
+- [x] T042 [US2] Add performance monitoring to ToolsTab.tsx and McpToolPage.tsx using performanceMonitor utility
+- [x] T043 [US2] Add ToolsTab to McpCatalogPage.tsx tabs
+- [x] T044 [US2] Implement hierarchical naming display in McpToolPage.tsx using hierarchicalNaming utility (server/tool format)
+- [x] T045 [US2] Add validation error display in McpToolPage.tsx for broken server references using validationService
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently - users can browse both servers and tools with full navigation
 
 ---
 
-## Phase 5: User Story 3 - Manage MCP Workloads (Priority: P3)
+## Phase 5: User Story 3 - Manage MCP Workloads (Priority: P3) ✅ COMPLETE
 
 **Goal**: Architects can view MCP workloads and their associated tools, understand tool composition, and see which workloads use specific tools
 
@@ -128,21 +128,21 @@ Backstage plugin structure:
 
 ### Implementation for User Story 3
 
-- [ ] T046 [P] [US3] Create WorkloadsTab.tsx in src/components/ with PatternFly table showing workload list, search, and filter
-- [ ] T047 [P] [US3] Create McpWorkloadPage.tsx in src/components/ displaying workload properties (name, description, purpose, deployment info)
-- [ ] T048 [US3] Add tools section to McpWorkloadPage.tsx listing all referenced tools with links to tool details per FR-004
-- [ ] T049 [US3] Integrate catalogService in WorkloadsTab.tsx to fetch MCP workload entities with filter kind=Component AND spec.type in ['workflow', 'service']
-- [ ] T050 [US3] Integrate catalogService in McpWorkloadPage.tsx to fetch workload details and referenced tools using spec.consumesTools
-- [ ] T051 [US3] Add pagination to WorkloadsTab.tsx using shared Pagination component (100 items/page)
-- [ ] T052 [US3] Implement text search and relationship filters (workloads by tool) in WorkloadsTab.tsx per FR-008
-- [ ] T053 [US3] Add performance monitoring to WorkloadsTab.tsx and McpWorkloadPage.tsx using performanceMonitor utility
-- [ ] T054 [US3] Add WorkloadsTab to McpCatalogPage.tsx tabs
-- [ ] T055 [US3] Implement tools-by-server grouping in McpWorkloadPage.tsx tools section for better organization
-- [ ] T056 [US3] Add validation error display in McpWorkloadPage.tsx for broken tool references using validationService
-- [ ] T057 [US3] Create DependencyTreeView.tsx in src/components/shared/ using PatternFly TreeView for hierarchical visualization per FR-010
-- [ ] T058 [US3] Integrate DependencyTreeView in McpWorkloadPage.tsx showing workload→server→tool hierarchy with expandable nodes
-- [ ] T059 [US3] Add clickable navigation from tree nodes to respective entity detail pages in DependencyTreeView
-- [ ] T060 [US3] Implement search/filter in DependencyTreeView for large dependency trees
+- [x] T046 [P] [US3] Create WorkloadsTab.tsx in src/components/ with PatternFly table showing workload list, search, and filter
+- [x] T047 [P] [US3] Create McpWorkloadPage.tsx in src/components/ displaying workload properties (name, description, purpose, deployment info)
+- [x] T048 [US3] Add tools section to McpWorkloadPage.tsx listing all referenced tools with links to tool details per FR-004
+- [x] T049 [US3] Integrate catalogService in WorkloadsTab.tsx to fetch MCP workload entities with filter kind=Component AND spec.type in ['workflow', 'service']
+- [x] T050 [US3] Integrate catalogService in McpWorkloadPage.tsx to fetch workload details and referenced tools using spec.consumesTools
+- [x] T051 [US3] Add pagination to WorkloadsTab.tsx using shared Pagination component (100 items/page)
+- [x] T052 [US3] Implement text search and relationship filters (workloads by tool) in WorkloadsTab.tsx per FR-008
+- [x] T053 [US3] Add performance monitoring to WorkloadsTab.tsx and McpWorkloadPage.tsx using performanceMonitor utility
+- [x] T054 [US3] Add WorkloadsTab to McpCatalogPage.tsx tabs
+- [x] T055 [US3] Implement tools-by-server grouping in McpWorkloadPage.tsx tools section for better organization
+- [x] T056 [US3] Add validation error display in McpWorkloadPage.tsx for broken tool references using validationService
+- [x] T057 [US3] Create DependencyTreeView.tsx in src/components/shared/ using PatternFly TreeView for hierarchical visualization per FR-010
+- [x] T058 [US3] Integrate DependencyTreeView in McpWorkloadPage.tsx showing workload→server→tool hierarchy with expandable nodes
+- [x] T059 [US3] Add clickable navigation from tree nodes to respective entity detail pages in DependencyTreeView
+- [x] T060 [US3] Implement search/filter in DependencyTreeView for large dependency trees
 
 **Checkpoint**: All user stories should now be independently functional - complete MCP catalog browsing experience
 

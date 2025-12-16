@@ -511,10 +511,9 @@ spec:
   type: mcp-tool
   lifecycle: production
   owner: platform-team
-  dependsOn:
-    - component:default/my-mcp-server
+  # subcomponentOf creates partOf/hasPart relations (Component to Component)
+  subcomponentOf: component:default/my-mcp-server
   mcp:
-    server: component:default/my-mcp-server
     toolType: query
     inputSchema:
       type: object
@@ -652,9 +651,12 @@ oc get svc backstage -n backstage -o jsonpath='{.spec.ports[*].port}'
    ```
 
 3. **Common YAML issues:**
-   - Don't use top-level `relations` field (use `spec.dependsOn` instead)
+   - Don't use top-level `relations` field (Backstage generates these)
+   - For tool→server: use `spec.subcomponentOf: component:ns/server`
+   - For workload→tool: use `spec.dependsOn: [component:ns/tool]`
    - Ensure `apiVersion: backstage.io/v1alpha1`
    - Ensure `kind: Component`
+   - Required spec fields: `type`, `lifecycle`, `owner`
 
 ### Plugin Detail Page Shows "undefined"
 

@@ -10,7 +10,8 @@ export interface CatalogMcpTool extends Entity {
     lifecycle: string;
     owner: string;
     system?: string;
-    partOf?: string; // Ref to server
+    subcomponentOf?: string; // Ref to parent server (Component to Component)
+    partOf?: string | string[]; // Ref to system (Component to System)
     inputSchema?: Record<string, any>;
     [key: string]: any;
   };

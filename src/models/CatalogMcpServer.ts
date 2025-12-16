@@ -12,6 +12,7 @@ export interface CatalogMcpServer extends Entity {
     system?: string;
     dependsOn?: string[];
     dependencyOf?: string[];
+    hasPart?: string | string[]; // Tools that are part of this server
     // Custom MCP fields
     transport?: {
       type: 'stdio' | 'sse' | 'http';

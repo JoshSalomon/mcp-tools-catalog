@@ -28,13 +28,30 @@ const ServersTab: React.FC = () => {
   const stopPerfMonitor = usePerformanceMonitor('ServersTab');
 
   // Fetch CatalogMcpServer entities from Backstage Catalog
-  const [servers, loaded, loadError] = useCatalogEntities<CatalogMcpServer>(CATALOG_MCP_SERVER_KIND, CATALOG_MCP_SERVER_TYPE);
+  const [allEntities, loaded, loadError] = useCatalogEntities<CatalogMcpServer>(CATALOG_MCP_SERVER_KIND, CATALOG_MCP_SERVER_TYPE);
 
   React.useEffect(() => {
     if (loaded) {
       stopPerfMonitor();
     }
   }, [loaded, stopPerfMonitor]);
+
+  // Filter to only show entities with spec.type === 'mcp-server' or 'server'
+  // Also check label mcp-catalog.io/type === 'server' as fallback
+  const servers = React.useMemo(() => {
+    if (!allEntities || allEntities.length === 0) return [];
+    
+    return allEntities.filter(entity => {
+      const entityType = entity.spec?.type || '';
+      const labelType = entity.metadata.labels?.['mcp-catalog.io/type'] || '';
+      
+      // Check spec.type: 'mcp-server' or 'server'
+      // Also check label as fallback
+      return entityType === 'mcp-server' || 
+             entityType === 'server' ||
+             labelType === 'server';
+    });
+  }, [allEntities]);
 
   const filteredServers = React.useMemo(() => {
     return filterResources(servers || [], searchTerm);
@@ -131,9 +148,15 @@ const ServersTab: React.FC = () => {
           </Thead>
           <Tbody>
             {paginatedServers.map((server) => {
-              // Count tools based on 'hasPart' or similar relations if available
-              // This assumes 'hasPart' relations point to tools
-              const toolCount = server.relations?.filter(r => r.type === 'hasPart').length || 0;
+              // Count tools based on 'hasPart' relations (standard Backstage pattern)
+              // Check both relations array and spec.hasPart
+              let toolCount = server.relations?.filter(r => r.type === 'hasPart').length || 0;
+              
+              // Also check spec.hasPart if relations are not populated yet
+              if (toolCount === 0 && server.spec.hasPart) {
+                const hasPart = Array.isArray(server.spec.hasPart) ? server.spec.hasPart : [server.spec.hasPart];
+                toolCount = hasPart.length;
+              }
               
               return (
                 <Tr key={server.metadata.uid || `${server.metadata.namespace}/${server.metadata.name}`}>

@@ -108,141 +108,172 @@ If you prefer to register entities manually for testing, follow the steps below.
 
 ## Step 1: Understanding MCP Entities
 
-The MCP Tools Catalog introduces three new entity types to Backstage:
+The MCP Tools Catalog uses **standard Backstage Component entities** with custom `spec.type` values:
 
-| Entity Type | Purpose | Example |
-|-------------|---------|---------|
-| **MCPServer** | AI capability providers | GitHub API server, File system server |
-| **MCPTool** | Individual AI functions | create-issue, read-file, analyze-text |
-| **MCPWorkload** | Composed workflows | Project setup automation, Content pipeline |
+| spec.type Value | Purpose | Example |
+|-----------------|---------|---------|
+| `mcp-server` | AI capability providers | GitHub API server, File system server |
+| `mcp-tool` | Individual AI functions | create-issue, read-file, analyze-text |
+| `service` / `workflow` / `mcp-workload` | Composed workflows | Project setup automation, Content pipeline |
+
+**Key Relationship**: Tools use `spec.subcomponentOf` to link to their parent server. Backstage automatically generates `partOf`/`hasPart` relations.
 
 ## Step 2: Register Your First MCP Server
 
 Create a new entity file `mcp-server-github.yaml`:
 
 ```yaml
-apiVersion: mcp-catalog.io/v1alpha1
-kind: MCPServer
+apiVersion: backstage.io/v1alpha1
+kind: Component
 metadata:
   name: github-integration-server
+  namespace: default
   description: "MCP server for GitHub API operations"
   labels:
-    mcp-catalog.io/type: "api-integration"
+    mcp-catalog.io/type: server
+    mcp-catalog.io/category: api-integration
   annotations:
     mcp-catalog.io/version: "1.0.0"
 spec:
-  type: stdio
-  endpoint: "docker run -i --rm ghcr.io/github/github-mcp-server"
-  version: "1.0.0"
-  capabilities: ["tools", "resources"]
+  type: mcp-server
+  lifecycle: production
+  owner: platform-team
+  mcp:
+    serverType: stdio
+    endpoint: "docker run -i --rm ghcr.io/github/github-mcp-server"
+    version: "1.0.0"
+    capabilities:
+      - tools
+      - resources
 ```
 
 **Register in Backstage:**
-1. Navigate to "Create Component" in Backstage
-2. Select "Register Existing Component"  
-3. Upload your YAML file or provide a Git repository URL
-4. Verify the server appears in the MCP Servers section
+1. Push the YAML to your GitHub catalog repository
+2. Wait for Backstage to sync (or trigger manual refresh)
+3. Verify the server appears in the MCP Catalog → Servers tab
 
 ## Step 3: Add MCP Tools
 
 Create `mcp-tools-github.yaml` with tools provided by your server:
 
 ```yaml
-# GitHub Issue Creation Tool
-apiVersion: mcp-catalog.io/v1alpha1
-kind: MCPTool
+apiVersion: backstage.io/v1alpha1
+kind: Component
 metadata:
   name: create-issue
+  namespace: default
   description: "Create GitHub issues with title, body, and labels"
   labels:
-    mcp-catalog.io/server: "github-integration-server"
-    mcp-catalog.io/category: "issue-management"
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: github-integration-server
 spec:
-  server: "mcpserver:default/github-integration-server"
-  type: "api-call"
-  inputSchema:
-    type: object
-    properties:
-      title: 
-        type: string
-        description: "Issue title"
-      body:
-        type: string 
-        description: "Issue description"
-      labels:
-        type: array
-        items:
+  type: mcp-tool
+  lifecycle: production
+  owner: platform-team
+  # subcomponentOf creates the tool-to-server relationship
+  subcomponentOf: component:default/github-integration-server
+  mcp:
+    toolType: api-call
+    inputSchema:
+      type: object
+      properties:
+        title: 
           type: string
-        description: "Issue labels"
-    required: ["title"]
-  capabilities: ["create", "github-api"]
-  parameters: ["title", "body", "labels"]
-
+          description: "Issue title"
+        body:
+          type: string 
+          description: "Issue description"
+        labels:
+          type: array
+          items:
+            type: string
+          description: "Issue labels"
+      required:
+        - title
+    capabilities:
+      - create
+      - github-api
 ---
-# GitHub Repository Search Tool  
-apiVersion: mcp-catalog.io/v1alpha1
-kind: MCPTool
+apiVersion: backstage.io/v1alpha1
+kind: Component
 metadata:
   name: search-repositories
+  namespace: default
   description: "Search GitHub repositories by keyword"
   labels:
-    mcp-catalog.io/server: "github-integration-server"
-    mcp-catalog.io/category: "search"
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: github-integration-server
 spec:
-  server: "mcpserver:default/github-integration-server"
-  type: "query"
-  inputSchema:
-    type: object
-    properties:
-      query:
-        type: string
-        description: "Search query"
-      language:
-        type: string
-        description: "Programming language filter"
-    required: ["query"]
-  capabilities: ["search", "github-api"]
-  parameters: ["query", "language"]
+  type: mcp-tool
+  lifecycle: production
+  owner: platform-team
+  subcomponentOf: component:default/github-integration-server
+  mcp:
+    toolType: query
+    inputSchema:
+      type: object
+      properties:
+        query:
+          type: string
+          description: "Search query"
+        language:
+          type: string
+          description: "Programming language filter"
+      required:
+        - query
+    capabilities:
+      - search
+      - github-api
 ```
 
 **Register the tools:**
-1. Follow the same registration process as the server
-2. Verify tools appear linked to their parent server
-3. Check that clicking on tool shows server relationship
+1. Push to your GitHub catalog repository
+2. After sync, verify tools appear in the MCP Catalog → Tools tab
+3. Check that clicking on a tool shows the parent server relationship
+4. Verify the server detail page shows these tools in its "Provided Tools" section
 
 ## Step 4: Create an MCP Workload
 
 Create `mcp-workload-project-setup.yaml` that uses your tools:
 
 ```yaml
-apiVersion: mcp-catalog.io/v1alpha1
-kind: MCPWorkload
+apiVersion: backstage.io/v1alpha1
+kind: Component
 metadata:
   name: new-project-setup
+  namespace: default
   description: "Automated new project initialization workflow"
   labels:
-    mcp-catalog.io/category: "automation"
-    mcp-catalog.io/status: "active"
+    mcp-catalog.io/type: workload
+    mcp-catalog.io/category: automation
 spec:
-  type: "workflow"
-  purpose: "Streamline new project creation with automated repository setup and initial issues"
-  tools:
-    - "mcptool:default/github-integration-server/create-repository"
-    - "mcptool:default/github-integration-server/create-issue"
-    - "mcptool:default/file-system-server/create-directory"
-  deploymentInfo:
-    schedule: "on-demand"
-    runtime: "nodejs"
-    environment: "development"
-  dependencies: 
-    - "GitHub API access"
-    - "File system permissions"
+  type: workflow
+  lifecycle: production
+  owner: platform-team
+  system: automation-platform
+  # dependsOn creates workload-to-tool relationships
+  dependsOn:
+    - component:default/create-issue
+    - component:default/search-repositories
+  mcp:
+    purpose: "Streamline new project creation with automated repository setup and initial issues"
+    tools:
+      - component:default/create-issue
+      - component:default/search-repositories
+    deployment:
+      type: kubernetes
+      schedule: on-demand
+      runtime: nodejs
+      environment: development
 ```
 
 **Register the workload:**
-1. Register using the same process
-2. Navigate to the workload page
-3. Verify you can see and click on all referenced tools
+1. Push to your GitHub catalog repository
+2. Navigate to MCP Catalog → Workloads tab
+3. Click on the workload to see:
+   - Tools grouped by server (expandable sections)
+   - Dependency tree view
+   - Links to individual tool pages
 
 ## Step 5: Navigate Entity Relationships
 
@@ -269,20 +300,23 @@ spec:
 ### Basic Searching
 ```
 # Find all MCP servers
-Filter by: kind=mcpserver
+Filter by: kind=Component,spec.type=mcp-server
 
-# Find tools for specific server
-Filter by: kind=mcptool,spec.server=mcpserver:default/github-integration-server
+# Find tools for specific server (via relations)
+Filter by: kind=Component,spec.type=mcp-tool,relations.partOf=component:default/github-integration-server
 
-# Find active workloads
-Filter by: kind=mcpworkload,metadata.labels['mcp-catalog.io/status']=active
+# Find workloads
+Filter by: kind=Component,spec.type=service
+# or
+Filter by: kind=Component,metadata.labels['mcp-catalog.io/type']=workload
 ```
 
-### Using Catalog Filters
-1. Navigate to Backstage catalog home
-2. Use entity type filters: "MCP Servers", "MCP Tools", "MCP Workloads"
-3. Apply label filters for more specific searches
-4. Combine filters to find specific entity combinations
+### Using MCP Catalog UI
+1. Navigate to MCP Catalog in the OpenShift Console
+2. Use the **Servers**, **Tools**, **Workloads** tabs to filter by type
+3. Use the search box to filter by name/description
+4. On Tools tab, use the "Server" dropdown to filter tools by parent server
+5. On Workloads tab, use the "Tool" dropdown to filter workloads by referenced tool
 
 ## Step 7: Managing Tool-Workload Relationships
 
@@ -332,19 +366,23 @@ create-issue (tool)
 
 ### Missing Relationships
 - **Issue**: Tool doesn't show parent server
-- **Solution**: Check that `spec.server` field uses correct EntityRef format: `mcpserver:namespace/servername`
+- **Solution**: Check that `spec.subcomponentOf` uses correct EntityRef format: `component:namespace/servername`
 
 ### Broken Tool References
 - **Issue**: Workload shows "tool not found" 
-- **Solution**: Verify tool exists and EntityRef format is correct: `mcptool:namespace/server/toolname`
+- **Solution**: Verify tool exists and `spec.dependsOn` uses correct format: `component:namespace/toolname`
 
 ### Server Not Showing Tools
 - **Issue**: Server page doesn't list provided tools
-- **Solution**: Ensure tools have correct server reference and both entities are registered
+- **Solution**: Ensure tools have `subcomponentOf: component:namespace/servername` and Backstage has synced. Check that the `partOf`/`hasPart` relations appear in the entity's relations array.
 
 ### Entity Not Appearing
 - **Issue**: Entity doesn't show up in catalog
-- **Solution**: Check YAML syntax, required fields, and entity registration status
+- **Solution**: Check YAML syntax, required fields (`kind: Component`, `spec.type`, `spec.lifecycle`, `spec.owner`), and wait for GitHub sync
+
+### Relations Not Generated
+- **Issue**: Tool has `subcomponentOf` but no `partOf` relation appears
+- **Solution**: Backstage generates relations during processing. Restart Backstage or wait for the next catalog refresh cycle. Verify the target entity exists.
 
 ## Next Steps
 

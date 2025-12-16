@@ -1,12 +1,12 @@
 # Data Model: MCP Tools Catalog
 
 **Feature**: MCP Tools Catalog
-**Date**: 2025-12-11 (Updated from 2025-11-24)
+**Date**: 2025-12-16 (Updated)
 **Source**: Extracted from [spec.md](./spec.md) and [research.md](./research.md)
 
 ## Entity Overview
 
-The MCP Tools Catalog extends Backstage with three Component subtypes representing Model Context Protocol infrastructure components. All entities use the standard Backstage `Component` kind with custom `spec.type` values and MCP-specific data in the `spec.mcp` field.
+The MCP Tools Catalog uses standard Backstage `Component` entities with custom `spec.type` values to represent Model Context Protocol infrastructure components. All MCP-specific data is stored in the `spec.mcp` field.
 
 **IMPORTANT**: These are NOT custom entity kinds. All MCP entities are standard Backstage Components with specialized types.
 
@@ -14,9 +14,36 @@ The MCP Tools Catalog extends Backstage with three Component subtypes representi
 
 | Component Type | spec.type Value | Purpose | Key Relationships | Cardinality |
 |----------------|-----------------|---------|------------------|-------------|
-| MCP Server | `server` | Represents MCP server instances | Parent of MCP Tool components | 1:N with Tools |
-| MCP Tool | `tool` | Individual AI capabilities/functions | Part of Server, Referenced by Workloads | N:1 with Server, M:N with Workloads |
-| MCP Workload | `workflow` or `service` | Composed applications using AI tools | Depends on multiple Tool components | M:N with Tools |
+| MCP Server | `mcp-server` | Represents MCP server instances | Parent of MCP Tools (via `hasPart`) | 1:N with Tools |
+| MCP Tool | `mcp-tool` | Individual AI capabilities/functions | Child of Server (via `subcomponentOf`), Referenced by Workloads | N:1 with Server, M:N with Workloads |
+| MCP Workload | `service`, `workflow`, or `mcp-workload` | Composed applications using AI tools | Depends on multiple Tool components | M:N with Tools |
+
+## Entity Relationships (Backstage Standard)
+
+The plugin uses standard Backstage relationship patterns:
+
+| Spec Field | Relation Generated | Direction | Use Case |
+|------------|-------------------|-----------|----------|
+| `spec.subcomponentOf` | `partOf` / `hasPart` | Tool → Server | Tool belongs to Server |
+| `spec.dependsOn` | `dependsOn` / `dependencyOf` | Workload → Tool | Workload uses Tool |
+| `spec.partOf` | `partOf` / `hasPart` | Component → System | System membership |
+
+### Tool-Server Relationship
+
+Tools declare their parent server using `spec.subcomponentOf`:
+
+```yaml
+# Tool entity
+spec:
+  type: mcp-tool
+  subcomponentOf: component:default/my-server  # Creates partOf relation
+```
+
+Backstage automatically generates:
+- `partOf` relation on the Tool pointing to the Server
+- `hasPart` relation on the Server pointing to the Tool
+
+---
 
 ## Detailed Entity Specifications
 
@@ -24,87 +51,65 @@ The MCP Tools Catalog extends Backstage with three Component subtypes representi
 
 **Purpose**: Represents a Model Context Protocol server instance that provides AI capabilities.
 
+**Backstage Entity Format:**
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: my-mcp-server
+  namespace: default
+  description: "MCP server providing AI capabilities"
+  labels:
+    mcp-catalog.io/type: server
+    mcp-catalog.io/category: demo
+  annotations:
+    mcp-catalog.io/version: "1.0.0"
+spec:
+  type: mcp-server
+  lifecycle: production
+  owner: platform-team
+  system: ai-infrastructure
+  # hasPart relations are auto-generated from tool subcomponentOf references
+  mcp:
+    serverType: stdio
+    endpoint: "docker run -i --rm ghcr.io/example/server:latest"
+    version: "1.0.0"
+    capabilities:
+      - tools
+      - resources
+```
+
 **TypeScript Interface:**
 ```typescript
 import { Entity } from '@backstage/catalog-model';
 
-export interface McpServerEntityV1alpha1 extends Entity {
-  apiVersion: 'mcp-catalog.openshift.io/v1alpha1';
-  kind: 'McpServer';
-  metadata: {
-    name: string;                    // Globally unique server identifier
-    description?: string;            // Human-readable server description
-    annotations?: {
-      'mcp-catalog.openshift.io/schema-version'?: string;  // MCP schema version
-      [key: string]: string | undefined;
-    };
-    labels?: {
-      [key: string]: string;
-    };
-    tags?: string[];
-  };
+export interface CatalogMcpServer extends Entity {
+  kind: 'Component';
   spec: {
-    type: string;                    // Server type classification
-    lifecycle: string;               // Lifecycle stage (production, experimental, etc.)
-    owner: string;                   // Owning team/user
-    system?: string;                 // System this server belongs to
-    transport: {
-      type: 'stdio' | 'sse' | 'http';  // Connection protocol
-      command?: string;              // Command for stdio type
-      args?: string[];               // Arguments for stdio command
-      env?: Record<string, string>;  // Environment variables
-      url?: string;                  // URL for sse/http types
+    type: string;              // 'mcp-server'
+    lifecycle: string;
+    owner: string;
+    system?: string;
+    hasPart?: string | string[];  // Auto-generated from subcomponentOf
+    mcp?: {
+      serverType?: 'stdio' | 'sse' | 'http';
+      endpoint?: string;
+      version?: string;
+      capabilities?: string[];
     };
-    providesTools?: string[];        // List of tool names this server provides
+    [key: string]: any;
   };
 }
 ```
 
 **Field Definitions:**
 
-- **name**: Globally unique identifier following DNS naming conventions
-- **type**: Server type classification (e.g., "filesystem", "api-integration")
-- **lifecycle**: Lifecycle stage (e.g., "production", "experimental", "deprecated")
-- **owner**: Team or user responsible for the server
-- **transport.type**: Connection protocol - one of: `stdio`, `sse`, `http`
-- **transport.command**: Command string for stdio connections
-- **transport.url**: Endpoint URL for sse/http connections
-- **providesTools**: Array of tool names (used for relationship tracking)
-
-**Validation Rules:**
-- Name must be globally unique across all McpServer entities (FR-001)
-- Transport type must be one of the supported connection types
-- Either command (for stdio) or url (for sse/http) must be provided
-- Owner must be specified
-
-**Example YAML:**
-```yaml
-apiVersion: mcp-catalog.openshift.io/v1alpha1
-kind: McpServer
-metadata:
-  name: filesystem-mcp-server
-  description: "MCP server providing filesystem operations"
-  annotations:
-    mcp-catalog.openshift.io/schema-version: '2025-09-29'
-  tags:
-    - filesystem
-    - stdio
-spec:
-  type: stdio
-  lifecycle: production
-  owner: platform-team
-  system: mcp-infrastructure
-  transport:
-    type: stdio
-    command: /usr/bin/mcp-server-fs
-    args: ["--root", "/data"]
-    env:
-      LOG_LEVEL: info
-  providesTools:
-    - read_file
-    - write_file
-    - list_directory
-```
+- **metadata.name**: Globally unique identifier following DNS naming conventions
+- **spec.type**: Must be `mcp-server`
+- **spec.lifecycle**: Lifecycle stage (e.g., "production", "experimental", "deprecated")
+- **spec.owner**: Team or user responsible for the server
+- **spec.mcp.serverType**: Connection protocol - one of: `stdio`, `sse`, `http`
+- **spec.mcp.endpoint**: Connection endpoint (command for stdio, URL for sse/http)
 
 ---
 
@@ -112,74 +117,78 @@ spec:
 
 **Purpose**: Represents individual AI capabilities or functions provided by an MCP server.
 
+**Backstage Entity Format:**
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: my-tool
+  namespace: default
+  description: "Tool that does something useful"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: my-mcp-server
+spec:
+  type: mcp-tool
+  lifecycle: production
+  owner: platform-team
+  # subcomponentOf establishes the tool-to-server relationship
+  subcomponentOf: component:default/my-mcp-server
+  mcp:
+    toolType: query
+    inputSchema:
+      type: object
+      properties:
+        param1:
+          type: string
+          description: "Parameter description"
+      required:
+        - param1
+    outputSchema:
+      type: object
+      properties:
+        result:
+          type: string
+    capabilities:
+      - read
+```
+
 **TypeScript Interface:**
 ```typescript
 import { Entity } from '@backstage/catalog-model';
 
-export interface McpToolEntityV1alpha1 extends Entity {
-  apiVersion: 'mcp-catalog.openshift.io/v1alpha1';
-  kind: 'McpTool';
-  metadata: {
-    name: string;                    // Tool name (unique within server scope)
-    description?: string;            // Human-readable tool description
-    annotations?: {
-      'mcp-catalog.openshift.io/provided-by'?: string;  // Parent server reference
-      [key: string]: string | undefined;
-    };
-    tags?: string[];
-  };
+export interface CatalogMcpTool extends Entity {
+  kind: 'Component';
   spec: {
-    type: string;                    // Tool type/category
-    lifecycle: string;               // Lifecycle stage
-    owner: string;                   // Owning team/user
-    providedBy: string;              // EntityRef to parent McpServer
-    inputSchema?: object;            // JSON Schema for tool parameters
+    type: string;              // 'mcp-tool'
+    lifecycle: string;
+    owner: string;
+    subcomponentOf?: string;   // Parent server reference
+    partOf?: string | string[];  // System reference
+    mcp?: {
+      toolType?: string;
+      inputSchema?: Record<string, any>;
+      outputSchema?: Record<string, any>;
+      capabilities?: string[];
+    };
+    [key: string]: any;
   };
 }
 ```
 
 **Field Definitions:**
 
-- **name**: Tool identifier, must be unique when combined with server reference
-- **type**: Tool category (e.g., "function", "file-operation", "api-call")
-- **lifecycle**: Tool lifecycle stage
-- **owner**: Team or user responsible (inherited from server)
-- **providedBy**: EntityRef to parent McpServer (e.g., "mcpserver:default/filesystem-mcp-server")
-- **inputSchema**: Optional JSON Schema object defining tool input parameters
+- **metadata.name**: Tool identifier, unique when combined with server
+- **spec.type**: Must be `mcp-tool`
+- **spec.subcomponentOf**: EntityRef to parent server (e.g., `component:default/my-server`)
+- **spec.mcp.toolType**: Tool category (e.g., "query", "mutation", "function")
+- **spec.mcp.inputSchema**: JSON Schema for tool input parameters
+- **spec.mcp.outputSchema**: JSON Schema for tool output
 
 **Uniqueness Rules:**
-- Tools are uniquely identified by the combination `server/toolname` (hierarchical naming - Clarifications 2025-10-26)
+- Tools are uniquely identified by the combination `server/toolname` (hierarchical naming)
 - Multiple servers can have tools with identical names
-- Server reference must exist and be valid (FR-005)
-
-**Display Requirements (from Clarifications 2025-11-24):**
-- Server detail screens show: tool name, description, tool type with clickable links
-
-**Example YAML:**
-```yaml
-apiVersion: mcp-catalog.openshift.io/v1alpha1
-kind: McpTool
-metadata:
-  name: read-file-tool
-  description: "Reads file contents from the filesystem"
-  annotations:
-    mcp-catalog.openshift.io/provided-by: filesystem-mcp-server
-  tags:
-    - filesystem
-    - read
-spec:
-  type: function
-  lifecycle: production
-  owner: platform-team
-  providedBy: filesystem-mcp-server
-  inputSchema:
-    type: object
-    properties:
-      path:
-        type: string
-        description: "File path to read"
-    required: [path]
-```
+- Server reference must exist and be valid
 
 ---
 
@@ -187,227 +196,243 @@ spec:
 
 **Purpose**: Represents composed applications or workflows that utilize multiple MCP tools.
 
+**Backstage Entity Format:**
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: my-workload
+  namespace: default
+  description: "Workload that uses MCP tools"
+  labels:
+    mcp-catalog.io/type: workload
+    mcp-catalog.io/category: automation
+spec:
+  type: service  # or 'workflow' or 'mcp-workload'
+  lifecycle: production
+  owner: platform-team
+  system: ai-platform
+  # dependsOn establishes workload-to-tool relationships
+  dependsOn:
+    - component:default/tool1
+    - component:default/tool2
+  # Optional: explicit tool list in consumes
+  consumes:
+    - component:default/tool1
+    - component:default/tool2
+  mcp:
+    purpose: "Description of workload purpose"
+    tools:
+      - component:default/tool1
+      - component:default/tool2
+    deployment:
+      type: kubernetes
+      namespace: my-namespace
+      replicas: 2
+```
+
 **TypeScript Interface:**
 ```typescript
 import { Entity } from '@backstage/catalog-model';
 
-export interface McpWorkloadEntityV1alpha1 extends Entity {
-  apiVersion: 'mcp-catalog.openshift.io/v1alpha1';
-  kind: 'McpWorkload';
-  metadata: {
-    name: string;                    // Globally unique workload identifier
-    description?: string;            // Human-readable workload description
-    labels?: {
-      'workload-type'?: string;      // Workload type classification
-      [key: string]: string;
-    };
-    tags?: string[];
-  };
+export interface CatalogMcpWorkload extends Entity {
+  kind: 'Component';
   spec: {
-    type: string;                    // Workload type (e.g., "deployment", "workflow")
-    lifecycle: string;               // Lifecycle stage
-    owner: string;                   // Owning team/user
-    system?: string;                 // System this workload belongs to
-    consumesServers?: string[];      // List of McpServer references
-    consumesTools?: string[];        // List of McpTool references
+    type: string;              // 'service', 'workflow', or 'mcp-workload'
+    lifecycle: string;
+    owner: string;
+    system?: string;
+    dependsOn?: string[];      // Tool references
+    consumes?: string[];       // Alternative tool references
+    mcp?: {
+      purpose?: string;
+      tools?: string[];
+      deployment?: Record<string, any>;
+    };
+    [key: string]: any;
   };
 }
 ```
 
 **Field Definitions:**
 
-- **name**: Globally unique workload identifier
-- **type**: Workload classification (e.g., "deployment", "batch-job", "ai-agent")
-- **lifecycle**: Workload lifecycle stage
-- **owner**: Team or user responsible
-- **system**: Optional system classification
-- **consumesServers**: Array of server names this workload uses
-- **consumesTools**: Array of tool names this workload uses
+- **metadata.name**: Globally unique workload identifier
+- **spec.type**: Workload classification (`service`, `workflow`, or `mcp-workload`)
+- **spec.dependsOn**: Array of tool references this workload uses
+- **spec.consumes**: Alternative field for tool references (checked as fallback)
+- **spec.mcp.tools**: MCP-specific tool list (checked as fallback)
+- **spec.mcp.purpose**: Description of workload purpose
+- **spec.mcp.deployment**: Deployment configuration details
 
-**Relationship Rules:**
-- Workloads are peer entities (no hierarchical dependencies - Clarifications 2025-10-26)
-- Each tool reference must point to an existing McpTool entity (FR-006)
-- Tool references are automatically updated during cascade operations (FR-013)
+---
 
-**Example YAML:**
+## Relationship Resolution Priority
+
+The plugin resolves relationships using the following priority order:
+
+### Tool → Server (finding parent server)
+1. `spec.subcomponentOf` (standard Backstage Component-to-Component)
+2. `spec.partOf` (if pointing to Component, not System)
+3. `relations[]` array with `type: 'partOf'`
+4. `spec.mcp.server` (legacy)
+5. `metadata.labels['mcp-catalog.io/server']` (fallback)
+
+### Server → Tools (finding child tools)
+1. `relations[]` array with `type: 'hasPart'` (auto-generated)
+2. `spec.hasPart` (explicit, not recommended)
+
+### Workload → Tools (finding consumed tools)
+1. `spec.dependsOn` array
+2. `spec.consumes` array
+3. `spec.mcp.tools` array
+4. `relations[]` array with `type: 'dependsOn'` or `type: 'consumesApi'`
+
+---
+
+## Example Entity Set
+
+### Server
 ```yaml
-apiVersion: mcp-catalog.openshift.io/v1alpha1
-kind: McpWorkload
+apiVersion: backstage.io/v1alpha1
+kind: Component
 metadata:
-  name: ai-agent-workload
-  description: "AI agent using MCP tools for file operations"
+  name: test1
+  namespace: default
+  description: "Test MCP server"
   labels:
-    workload-type: ai-agent
-  tags:
-    - ai
-    - automation
+    mcp-catalog.io/type: server
 spec:
-  type: deployment
-  lifecycle: production
-  owner: ai-team
-  system: ai-platform
-  consumesServers:
-    - filesystem-mcp-server
-    - database-mcp-server
-  consumesTools:
-    - read_file
-    - write_file
-    - query_database
+  type: mcp-server
+  lifecycle: experimental
+  owner: platform-team
+  mcp:
+    serverType: stdio
+    endpoint: "docker run -i --rm ghcr.io/example/test1-server:latest"
+    version: "1.0.0"
+    capabilities:
+      - tools
+      - resources
+```
+
+### Tools
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: getinfo
+  namespace: default
+  description: "Read details from the server"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: test1
+spec:
+  type: mcp-tool
+  lifecycle: experimental
+  owner: platform-team
+  subcomponentOf: component:default/test1
+  mcp:
+    toolType: query
+    inputSchema:
+      type: object
+      properties:
+        resourceId:
+          type: string
+      required:
+        - resourceId
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: setinfo
+  namespace: default
+  description: "Update data on the server"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: test1
+spec:
+  type: mcp-tool
+  lifecycle: experimental
+  owner: platform-team
+  subcomponentOf: component:default/test1
+  mcp:
+    toolType: mutation
+    inputSchema:
+      type: object
+      properties:
+        resourceId:
+          type: string
+        payload:
+          type: object
+      required:
+        - resourceId
+        - payload
+```
+
+### Workload
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: data-sync-service
+  namespace: default
+  description: "Service that synchronizes data using MCP tools"
+  labels:
+    mcp-catalog.io/type: workload
+spec:
+  type: service
+  lifecycle: experimental
+  owner: platform-team
+  system: data-platform
+  dependsOn:
+    - component:default/getinfo
+    - component:default/setinfo
+  mcp:
+    purpose: "Automated data synchronization"
+    tools:
+      - component:default/getinfo
+      - component:default/setinfo
+    deployment:
+      type: kubernetes
+      replicas: 2
 ```
 
 ---
 
-## Entity Relationships
+## Performance Considerations
 
-### Relationship Types
-
-1. **Server → Tool (1:N)**
-   - Relationship: `providesTo` (from Server to Tool)
-   - Cascade Behavior: Delete tools when server is deleted (FR-012)
-   - Validation: Tool `providedBy` references must exist (FR-005)
-
-2. **Tool ← → Workload (M:N)**
-   - Relationship: `consumedBy` (bidirectional)
-   - Cascade Behavior: Update workload references when tool is deleted (FR-013)
-   - Validation: Workload tool references must exist (FR-006)
-   - Display: Show bidirectional relationships (FR-004)
-
-3. **Workload ← → Workload (Peer)**
-   - Relationship: None (workloads are peer entities)
-   - No hierarchical dependencies allowed (Clarifications 2025-10-26)
-   - No cascade behavior between workloads
-
-### Cascade Delete Behavior
-
-**When McpServer is deleted (FR-012):**
-1. All child McpTool entities are automatically deleted
-2. Workload entities are updated to remove references to deleted tools (FR-013)
-3. Relationship graph is updated to reflect changes
-
-**When McpTool is deleted:**
-1. All McpWorkload entities are updated to remove tool references (FR-013)
-2. Empty workloads (no tool references) remain valid
-
-**When McpWorkload is deleted:**
-1. No cascade effects on other entities
-2. Only relationship records are cleaned up
-
----
-
-## State Transitions
-
-### McpServer Lifecycle
-```
-Created → Registered → Active ⟷ Offline → Deleted
-```
-
-**Offline Handling (Clarifications 2025-11-24):**
-- When server is offline or unreachable, display cached metadata with visual indicator (FR-016)
-- Server status is NOT actively checked by this plugin (handled elsewhere)
-
-### McpTool Lifecycle
-```
-Defined → Validated → Available → Deprecated → Removed
-```
-
-### McpWorkload Lifecycle
-```
-Designed → Configured → Deployed → Active → Retired
-```
-
----
-
-## Validation Rules Summary
-
-1. **Global Uniqueness**: McpServer names and McpWorkload names must be globally unique
-2. **Hierarchical Uniqueness**: McpTool names must be unique within their parent server (hierarchical naming: server/tool)
-3. **Reference Integrity**: All entity references must point to existing entities (FR-005, FR-006)
-4. **Cascade Consistency**: Cascade deletes must maintain referential integrity (FR-012, FR-013)
-5. **Schema Compliance**: All entities must conform to their respective JSON schemas
-6. **Relationship Limits**: No circular dependencies between workloads (treated as peers)
-
----
-
-## Performance Considerations (from Clarifications 2025-11-24)
-
-**Performance Targets (SC-005, SC-006):**
+**Performance Targets:**
 - List views load in under 2 seconds
 - Detail pages load in under 1 second
 - Search results return in under 1 second
-- Pagination at 100 items per page (FR-017)
+- Pagination at 100 items per page
 
 **Optimization Strategies:**
-- Field selection for catalog API queries (fetch only needed fields)
-- Client-side caching of entity relationships
-- Incremental loading for large tool lists on server detail pages
-- Search index for text search and relationship filters (FR-008)
-
-**Search and Filtering (FR-008, Clarifications 2025-11-24):**
-- Text search by name and description across all entity types
-- Relationship filters: tools by server, workloads by tool, servers by tool count
-- Entity type filters (McpServer, McpTool, McpWorkload)
-
----
-
-## Data Access Patterns
-
-### Frontend Plugin Data Access
-Since this is an OpenShift Console dynamic plugin (frontend-only), all data access occurs via Backstage catalog API:
-
-```typescript
-import { catalogApiRef } from '@backstage/plugin-catalog-react';
-
-// Fetch McpServer entities
-const servers = await catalogApi.getEntities({
-  filter: { kind: 'McpServer' },
-  fields: ['metadata.name', 'spec.type', 'spec.transport']
-});
-
-// Fetch tools for a specific server
-const tools = await catalogApi.getEntities({
-  filter: {
-    kind: 'McpTool',
-    'spec.providedBy': 'filesystem-mcp-server'
-  }
-});
-
-// Fetch workloads consuming a specific tool
-const workloads = await catalogApi.getEntities({
-  filter: {
-    kind: 'McpWorkload',
-    'spec.consumesTools': 'read_file'
-  }
-});
-```
-
-**No Backend Processor in This Plugin:**
-- Entity definitions are registered via YAML files in the Backstage catalog
-- Relationship management handled by Backstage catalog backend (existing)
-- Plugin consumes entities as read-only data (FR-014)
+- Client-side filtering after initial entity fetch
+- Relation resolution from entity data (no extra API calls)
+- Performance monitoring using `usePerformanceMonitor` hook
 
 ---
 
 ## UI Display Requirements
 
-### Server Detail Screen (User Story 1, FR-002, FR-015)
-Display all server properties:
-- Name, description, version, connection endpoint
-- List of exported tools showing: tool name, description, tool type
-- Clickable links to individual tool detail pages
+### Server Detail Screen
+- Server properties: name, namespace, type, lifecycle, owner
+- MCP-specific: serverType, endpoint, version, capabilities
+- Tools list with count, showing: name, type, lifecycle, owner
+- Clickable links to tool detail pages
 
-### Tool Detail Screen (User Story 2, FR-003)
-- Tool name, description, type, parameters
-- Clear indication of parent server
-- Clickable link to parent server detail page
-- List of workloads that use this tool (bidirectional relationship - FR-004)
+### Tool Detail Screen
+- Tool properties: name, namespace, type, lifecycle, owner
+- MCP-specific: toolType, inputSchema, outputSchema, capabilities
+- Parent server section with clickable link
+- Hierarchical name display (server/tool format)
+- "Used By" workloads section
+- Validation warning for broken server references
 
-### Workload Detail Screen (User Story 3)
-- Workload name, description, purpose
-- List of associated tools with links to tool details
-- Organized by parent server
-
-### Hierarchical Tree View (FR-010, Clarifications 2025-11-24)
-- Interactive tree with expandable nodes
-- Structure: Workload → Server → Tool
-- PatternFly TreeView component implementation
-- Clickable nodes navigate to entity detail pages
+### Workload Detail Screen
+- Workload properties: name, namespace, type, lifecycle, owner
+- MCP-specific: purpose, deployment info
+- Tools grouped by parent server (expandable sections)
+- Dependency tree view (hierarchical visualization)
+- Validation warning for broken tool references
+- Clickable links to tools and servers
