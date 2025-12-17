@@ -6,22 +6,48 @@ import {
   Tabs,
   Tab,
   TabTitleText,
+  Toolbar,
+  ToolbarContent,
+  ToolbarItem,
+  ToolbarGroup,
+  SearchInput,
+  Label,
+  LabelGroup,
+  Flex,
+  FlexItem,
 } from '@patternfly/react-core';
+import { ServerIcon, WrenchIcon, CubeIcon } from '@patternfly/react-icons';
 import ServersTab from './ServersTab';
 import ToolsTab from './ToolsTab';
 import WorkloadsTab from './WorkloadsTab';
+import { ErrorBoundary } from './shared/ErrorBoundary';
 
 /**
  * MCP Catalog Page
- * Displays the list of MCP servers, tools, and workloads
+ * Displays the list of MCP servers, tools, and workloads with global search and entity type filters
  */
 const McpCatalogPage: React.FC = () => {
   const location = useLocation();
   const history = useHistory();
   
-  // Get active tab from URL query parameter
+  // Get active tab and search from URL query parameters
   const searchParams = new URLSearchParams(location.search);
   const activeTab = searchParams.get('type') || 'server';
+  const urlSearch = searchParams.get('search') || '';
+  
+  const [globalSearch, setGlobalSearch] = React.useState(urlSearch);
+  
+  // Update URL when search changes
+  const updateSearch = (value: string) => {
+    setGlobalSearch(value);
+    const params = new URLSearchParams(location.search);
+    if (value) {
+      params.set('search', value);
+    } else {
+      params.delete('search');
+    }
+    history.replace(`/mcp-catalog?${params.toString()}`);
+  };
   
   const handleTabClick = (_event: React.MouseEvent<HTMLElement, MouseEvent>, tabIndex: string | number) => {
     const tabMap: Record<string, string> = {
@@ -30,7 +56,12 @@ const McpCatalogPage: React.FC = () => {
       '2': 'workload',
     };
     const tabName = tabMap[String(tabIndex)] || 'server';
-    history.push(`/mcp-catalog?type=${tabName}`);
+    const params = new URLSearchParams();
+    params.set('type', tabName);
+    if (globalSearch) {
+      params.set('search', globalSearch);
+    }
+    history.push(`/mcp-catalog?${params.toString()}`);
   };
 
   const getActiveTabIndex = (): number => {
@@ -45,17 +76,78 @@ const McpCatalogPage: React.FC = () => {
         return 0;
     }
   };
+  
+  // Quick filter to switch to a specific entity type
+  const handleTypeFilter = (type: 'server' | 'tool' | 'workload') => {
+    const params = new URLSearchParams();
+    params.set('type', type);
+    if (globalSearch) {
+      params.set('search', globalSearch);
+    }
+    history.push(`/mcp-catalog?${params.toString()}`);
+  };
 
   return (
     <>
       <PageSection>
-        <Title headingLevel="h1" size="lg">
-          MCP Tools Catalog
-        </Title>
-        <p>
-          Browse and manage Model Context Protocol (MCP) servers, tools, and workloads.
-        </p>
+        <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
+          <FlexItem>
+            <Title headingLevel="h1" size="lg">
+              MCP Tools Catalog
+            </Title>
+            <p>
+              Browse and manage Model Context Protocol (MCP) servers, tools, and workloads.
+            </p>
+          </FlexItem>
+        </Flex>
       </PageSection>
+      
+      <PageSection padding={{ default: 'noPadding' }}>
+        <Toolbar>
+          <ToolbarContent>
+            <ToolbarItem>
+              <SearchInput
+                placeholder="Search across all entities..."
+                value={globalSearch}
+                onChange={(_event, value) => updateSearch(value)}
+                onClear={() => updateSearch('')}
+                aria-label="Global search"
+              />
+            </ToolbarItem>
+            <ToolbarGroup variant="filter-group">
+              <ToolbarItem>
+                <LabelGroup categoryName="Filter by type">
+                  <Label
+                    color={activeTab === 'server' ? 'blue' : 'grey'}
+                    icon={<ServerIcon />}
+                    onClick={() => handleTypeFilter('server')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    Servers
+                  </Label>
+                  <Label
+                    color={activeTab === 'tool' ? 'blue' : 'grey'}
+                    icon={<WrenchIcon />}
+                    onClick={() => handleTypeFilter('tool')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    Tools
+                  </Label>
+                  <Label
+                    color={activeTab === 'workload' ? 'blue' : 'grey'}
+                    icon={<CubeIcon />}
+                    onClick={() => handleTypeFilter('workload')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    Workloads
+                  </Label>
+                </LabelGroup>
+              </ToolbarItem>
+            </ToolbarGroup>
+          </ToolbarContent>
+        </Toolbar>
+      </PageSection>
+      
       <PageSection padding={{ default: 'noPadding' }}>
         <Tabs
           activeKey={getActiveTabIndex()}
@@ -65,17 +157,23 @@ const McpCatalogPage: React.FC = () => {
         >
           <Tab eventKey={0} title={<TabTitleText>Servers</TabTitleText>}>
             <PageSection>
-              <ServersTab />
+              <ErrorBoundary>
+                <ServersTab initialSearch={globalSearch} />
+              </ErrorBoundary>
             </PageSection>
           </Tab>
           <Tab eventKey={1} title={<TabTitleText>Tools</TabTitleText>}>
             <PageSection>
-              <ToolsTab />
+              <ErrorBoundary>
+                <ToolsTab initialSearch={globalSearch} />
+              </ErrorBoundary>
             </PageSection>
           </Tab>
           <Tab eventKey={2} title={<TabTitleText>Workloads</TabTitleText>}>
             <PageSection>
-              <WorkloadsTab />
+              <ErrorBoundary>
+                <WorkloadsTab initialSearch={globalSearch} />
+              </ErrorBoundary>
             </PageSection>
           </Tab>
         </Tabs>

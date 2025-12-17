@@ -77,7 +77,43 @@ If your OpenShift cluster uses self-signed certificates, all `curl` commands in 
 
 ## 🚀 Part A: Build and Deploy the Console Plugin
 
-### A1. Build the Plugin
+### A1. One-Command Deployment (Recommended)
+
+Use the unified deployment script to build, push, deploy, and test in a single command:
+
+```bash
+# Full pipeline: build, push to registry, deploy to OpenShift, run sanity tests
+./build-push-deploy-test.sh
+
+# Common options:
+./build-push-deploy-test.sh --skip-build    # Redeploy existing image
+./build-push-deploy-test.sh --skip-tests    # Skip sanity tests after deployment
+./build-push-deploy-test.sh --build-only    # Just build the container image
+./build-push-deploy-test.sh --verbose       # Show detailed output
+```
+
+**Configure your environment** by creating `.image-config.sh`:
+
+```bash
+IMAGE_REGISTRY="quay.io"
+IMAGE_ORG="your-org"
+IMAGE_NAME="mcp-tools-catalog"
+IMAGE_TAG="latest"
+OPENSHIFT_NAMESPACE="mcp-tools-catalog"
+DEPLOYMENT_NAME="mcp-catalog"
+BACKSTAGE_NAMESPACE="backstage"
+```
+
+The script automatically:
+- Builds the Backstage and console plugins
+- Pushes the container image to your registry
+- Updates the OpenShift deployment and forces a rollout
+- Restarts console pods for immediate effect
+- Runs sanity tests to verify the deployment
+
+### A2. Manual Build (Alternative)
+
+If you prefer manual control over each step:
 
 ```bash
 # Install dependencies and build
@@ -88,9 +124,9 @@ yarn build
 yarn test
 ```
 
-### A2. Build and Push Container Image
+### A3. Manual Container Build
 
-**Option 1: Use the build script (recommended)**
+**Option 1: Use the build script**
 
 ```bash
 ./build-container.sh
@@ -106,7 +142,7 @@ podman build -f Dockerfile.local -t quay.io/your-org/mcp-tools-catalog:latest .
 podman push quay.io/your-org/mcp-tools-catalog:latest
 ```
 
-### A3. Deploy with Helm
+### A4. Manual Helm Deployment
 
 ```bash
 # Create namespace
@@ -119,7 +155,7 @@ helm install mcp-catalog charts/openshift-console-plugin \
   --namespace mcp-tools-catalog
 ```
 
-### A4. Enable the Plugin
+### A6. Enable the Plugin
 
 ```bash
 # Enable the plugin in OpenShift Console
@@ -128,7 +164,7 @@ oc patch consoles.operator.openshift.io cluster \
   --type=merge
 ```
 
-### A5. Verify Plugin Deployment
+### A7. Verify Plugin Deployment
 
 ```bash
 # Check pod status
@@ -141,6 +177,9 @@ oc get consoleplugin mcp-catalog
 oc port-forward -n mcp-tools-catalog svc/mcp-catalog 9443:9443 &
 curl -k https://localhost:9443/plugin-manifest.json
 kill %1
+
+# Or run the quick sanity check
+./tests/sanity/quick-check.sh
 ```
 
 ---
@@ -538,7 +577,21 @@ oc rollout restart deployment/backstage -n backstage
 
 ## ✅ Verification
 
-### Verify Backstage Catalog
+### Quick Verification (Recommended)
+
+Run the automated sanity tests to verify the entire system:
+
+```bash
+# Quick health check (~30 seconds)
+./tests/sanity/quick-check.sh
+
+# Full diagnostic suite with detailed output
+./tests/sanity/run-sanity-tests.sh --verbose
+```
+
+### Manual Verification
+
+#### Verify Backstage Catalog
 
 ```bash
 # Port-forward to Backstage
@@ -552,14 +605,14 @@ curl -s http://localhost:7007/api/catalog/entities | jq '.[] | {kind, type: .spe
 kill %1
 ```
 
-### Verify Console Plugin
+#### Verify Console Plugin
 
 1. Open OpenShift Console in your browser
 2. Look for "MCP Catalog" in the left navigation
 3. Navigate to `/mcp-catalog` to see the plugin
 4. Verify servers, tools, and workloads appear
 
-### Check for Errors
+#### Check for Errors
 
 ```bash
 # Backstage logs
@@ -577,6 +630,21 @@ oc logs -n openshift-console -l app=console | grep -i mcp
 ## 🔄 Operations
 
 ### Update Plugin Image
+
+**Option 1: Use the unified script (recommended)**
+
+```bash
+# Full update: build, push, deploy, test
+./build-push-deploy-test.sh
+
+# Skip tests for faster deployment
+./build-push-deploy-test.sh --skip-tests
+
+# Redeploy without rebuilding (uses existing image)
+./build-push-deploy-test.sh --skip-build
+```
+
+**Option 2: Manual update**
 
 ```bash
 # Rebuild and push
@@ -605,9 +673,33 @@ helm rollback mcp-catalog 1 -n mcp-tools-catalog
 oc rollout restart deployment/backstage -n backstage
 ```
 
+### Health Checks
+
+Run sanity tests to verify system health:
+
+```bash
+# Quick health check (~30 seconds)
+./tests/sanity/quick-check.sh
+
+# Full diagnostic suite
+./tests/sanity/run-sanity-tests.sh --verbose
+```
+
 ---
 
 ## 🔧 Troubleshooting
+
+### Quick Diagnostics
+
+Start by running the sanity test scripts to identify issues:
+
+```bash
+# Quick health check - identifies common problems
+./tests/sanity/quick-check.sh
+
+# Full diagnostic suite with detailed output
+./tests/sanity/run-sanity-tests.sh --verbose
+```
 
 ### Plugin Shows "No MCP Servers Found"
 
@@ -723,4 +815,5 @@ See the full authentication setup guide in the [Authentication TODO](#todo-authe
 
 - [BUILD-FIXES.md](BUILD-FIXES.md) - Container build troubleshooting
 - [specs/001-mcp-tools-catalog/quickstart.md](specs/001-mcp-tools-catalog/quickstart.md) - Quick start guide
+- [tests/sanity/README.md](tests/sanity/README.md) - Sanity test documentation
 - [Backstage Documentation](https://backstage.io/docs)

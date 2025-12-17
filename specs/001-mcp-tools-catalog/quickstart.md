@@ -100,6 +100,29 @@ curl -k "https://backstage.example.com/api/catalog/entities?filter=kind=componen
 
 For detailed configuration options, see [DEPLOYMENT.md](../../DEPLOYMENT.md#-configure-github-catalog-integration).
 
+### Deploying Plugin Updates
+
+When you need to update the MCP Catalog console plugin, use the unified deployment script:
+
+```bash
+# Full pipeline: build, push, deploy, and run sanity tests
+./build-push-deploy-test.sh
+
+# Common options:
+./build-push-deploy-test.sh --skip-build    # Redeploy existing image
+./build-push-deploy-test.sh --skip-tests    # Deploy without running tests
+./build-push-deploy-test.sh --build-only    # Just build the container
+```
+
+The script automatically:
+- Builds the Backstage and console plugins
+- Pushes the container image to your registry
+- Updates the OpenShift deployment
+- Restarts console pods for immediate effect
+- Runs sanity tests to verify the deployment
+
+Configure your settings in `.image-config.sh` (see [README.md](../../README.md#-deployment) for details).
+
 ---
 
 ## Manual Path: Direct Registration
@@ -114,7 +137,7 @@ The MCP Tools Catalog uses **standard Backstage Component entities** with custom
 |-----------------|---------|---------|
 | `mcp-server` | AI capability providers | GitHub API server, File system server |
 | `mcp-tool` | Individual AI functions | create-issue, read-file, analyze-text |
-| `service` / `workflow` / `mcp-workload` | Composed workflows | Project setup automation, Content pipeline |
+| `mcp-workload` | Composed workflows using MCP tools | Project setup automation, Content pipeline |
 
 **Key Relationship**: Tools use `spec.subcomponentOf` to link to their parent server. Backstage automatically generates `partOf`/`hasPart` relations.
 
@@ -247,7 +270,7 @@ metadata:
     mcp-catalog.io/type: workload
     mcp-catalog.io/category: automation
 spec:
-  type: workflow
+  type: mcp-workload
   lifecycle: production
   owner: platform-team
   system: automation-platform
@@ -305,9 +328,10 @@ Filter by: kind=Component,spec.type=mcp-server
 # Find tools for specific server (via relations)
 Filter by: kind=Component,spec.type=mcp-tool,relations.partOf=component:default/github-integration-server
 
-# Find workloads
-Filter by: kind=Component,spec.type=service
-# or
+# Find all MCP workloads
+Filter by: kind=Component,spec.type=mcp-workload
+
+# Alternative: Find workloads by label
 Filter by: kind=Component,metadata.labels['mcp-catalog.io/type']=workload
 ```
 
@@ -364,6 +388,18 @@ create-issue (tool)
 
 ## Troubleshooting
 
+### Quick Diagnostics
+
+Run the sanity test scripts to quickly identify issues:
+
+```bash
+# Quick health check (~30 seconds) - checks pods, plugins, API
+./tests/sanity/quick-check.sh
+
+# Full diagnostic suite with detailed output
+./tests/sanity/run-sanity-tests.sh --verbose
+```
+
 ### Missing Relationships
 - **Issue**: Tool doesn't show parent server
 - **Solution**: Check that `spec.subcomponentOf` uses correct EntityRef format: `component:namespace/servername`
@@ -383,6 +419,10 @@ create-issue (tool)
 ### Relations Not Generated
 - **Issue**: Tool has `subcomponentOf` but no `partOf` relation appears
 - **Solution**: Backstage generates relations during processing. Restart Backstage or wait for the next catalog refresh cycle. Verify the target entity exists.
+
+### Plugin Not Loading
+- **Issue**: MCP Catalog doesn't appear in OpenShift Console
+- **Solution**: Run `./tests/sanity/quick-check.sh` to verify plugin registration, then check console pod logs with `oc logs -n openshift-console -l app=console`
 
 ## Next Steps
 

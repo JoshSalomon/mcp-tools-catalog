@@ -148,15 +148,15 @@ Backstage plugin structure:
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## Phase 6: Polish & Cross-Cutting Concerns (IN PROGRESS)
 
 **Purpose**: Improvements that affect multiple user stories and production readiness
 
-- [ ] T061 [P] Add loading states to all tab components (ServersTab, ToolsTab, WorkloadsTab)
-- [ ] T062 [P] Add error boundary components for graceful error handling across all pages
-- [ ] T063 [P] Implement empty state components for tabs with no entities
-- [ ] T064 [P] Add PatternFly breadcrumb navigation to detail pages
-- [ ] T065 Add entity type filters (McpServer, McpTool, McpWorkload) to catalog search per FR-008
+- [x] T061 [P] Add loading states to all tab components (ServersTab, ToolsTab, WorkloadsTab)
+- [x] T062 [P] Add error boundary components for graceful error handling across all pages
+- [x] T063 [P] Implement empty state components for tabs with no entities
+- [x] T064 [P] Add PatternFly breadcrumb navigation to detail pages
+- [x] T065 Add entity type filters (McpServer, McpTool, McpWorkload) to catalog search per FR-008
 - [ ] T066 [P] Create unit tests for ServersTab in src/components/ServersTab.spec.tsx
 - [ ] T067 [P] Create unit tests for McpServerPage in src/components/McpServerPage.spec.tsx
 - [ ] T068 [P] Create unit tests for ToolsTab in src/components/ToolsTab.spec.tsx
@@ -170,13 +170,13 @@ Backstage plugin structure:
 - [ ] T076 Create integration test for server browsing in integration-tests/cypress/e2e/server-browsing.cy.ts
 - [ ] T077 [P] Create integration test for tool exploration in integration-tests/cypress/e2e/tool-exploration.cy.ts
 - [ ] T078 [P] Create integration test for workload management in integration-tests/cypress/e2e/workload-management.cy.ts
-- [ ] T079 Create sample entity YAML files for testing: mcp-server-example.yaml, mcp-tool-example.yaml, mcp-workload-example.yaml
+- [x] T079 Create sample entity YAML files for testing: mcp-server-example.yaml, mcp-tool-example.yaml, mcp-workload-example.yaml
 - [ ] T080 [P] Add accessibility testing to all components (ARIA labels, keyboard navigation)
-- [ ] T081 [P] Update deployment/kubernetes/deployment.yaml with resource limits and health checks
-- [ ] T082 [P] Verify container image builds with non-root user and minimal base image
-- [ ] T083 Run quickstart.md validation to ensure all examples work
-- [ ] T084 [P] Add JSDoc comments to all public APIs and exported components
-- [ ] T085 Code cleanup and remove any unused imports or commented code
+- [x] T081 [P] Update deployment/kubernetes/deployment.yaml with resource limits and health checks
+- [x] T082 [P] Verify container image builds with non-root user and minimal base image
+- [x] T083 Run quickstart.md validation to ensure all examples work
+- [x] T084 [P] Add JSDoc comments to all public APIs and exported components
+- [x] T085 Code cleanup and remove any unused imports or commented code
 
 ---
 

@@ -178,6 +178,10 @@ yarn cypress:run
 
 # Lint and format
 yarn lint
+
+# Sanity tests (against deployed cluster)
+./tests/sanity/quick-check.sh        # Quick health check (~30 seconds)
+./tests/sanity/run-sanity-tests.sh   # Full test suite with detailed output
 ```
 
 ### Manual Testing Scenarios
@@ -209,6 +213,39 @@ yarn lint
 > These steps are validated against a vanilla OpenShift Container Platform cluster with upstream Backstage distributions. If you enable any Red Hat Developer Hub–specific features, document a fallback that keeps the plugin functional on vanilla clusters.
 
 > **Deploying Backstage itself?** See the comprehensive [Deployment Guide (DEPLOYMENT.md)](DEPLOYMENT.md#-deploying-upstream-backstage-on-openshift) for instructions on deploying upstream Backstage to OpenShift, including the required Dockerfile patches for OpenShift's Security Context Constraints.
+
+### One-Command Deployment (Recommended)
+
+Use the unified build-push-deploy script for a complete deployment pipeline:
+
+```bash
+# Full pipeline: build, push to registry, deploy to OpenShift, run sanity tests
+./build-push-deploy-test.sh
+
+# Skip build (use existing image)
+./build-push-deploy-test.sh --skip-build
+
+# Build only (don't push or deploy)
+./build-push-deploy-test.sh --build-only
+
+# Skip sanity tests
+./build-push-deploy-test.sh --skip-tests
+```
+
+**Configure your environment** by creating `.image-config.sh`:
+```bash
+IMAGE_REGISTRY="quay.io"
+IMAGE_ORG="your-org"
+IMAGE_NAME="mcp-tools-catalog"
+IMAGE_TAG="latest"
+OPENSHIFT_NAMESPACE="mcp-tools-catalog"
+DEPLOYMENT_NAME="mcp-catalog"
+BACKSTAGE_NAMESPACE="backstage"
+```
+
+### Manual Deployment Steps
+
+If you prefer manual control over each step:
 
 1. **Build and push container:**
    ```bash

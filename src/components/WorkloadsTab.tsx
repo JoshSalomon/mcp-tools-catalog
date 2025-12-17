@@ -27,13 +27,24 @@ import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE } from '..
 import { useCatalogEntities } from '../services/catalogService';
 import { getEntityName } from '../utils/hierarchicalNaming';
 
-const WorkloadsTab: React.FC = () => {
+interface WorkloadsTabProps {
+  /** Initial search term from parent component */
+  initialSearch?: string;
+}
+
+const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
   const history = useHistory();
-  const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchTerm, setSearchTerm] = React.useState(initialSearch);
   const [toolFilter, setToolFilter] = React.useState<string>('');
   const [isToolFilterOpen, setIsToolFilterOpen] = React.useState(false);
   const [page, setPage] = React.useState(1);
   const [perPage, setPerPage] = React.useState(100);
+  
+  // Sync with parent search term
+  React.useEffect(() => {
+    setSearchTerm(initialSearch);
+    setPage(1);
+  }, [initialSearch]);
 
   const stopPerfMonitor = usePerformanceMonitor('WorkloadsTab');
 

@@ -19,11 +19,22 @@ import { Pagination } from './shared/Pagination';
 import { CatalogMcpServer, CATALOG_MCP_SERVER_KIND, CATALOG_MCP_SERVER_TYPE } from '../models/CatalogMcpServer';
 import { useCatalogEntities } from '../services/catalogService';
 
-const ServersTab: React.FC = () => {
+interface ServersTabProps {
+  /** Initial search term from parent component */
+  initialSearch?: string;
+}
+
+const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
   const history = useHistory();
-  const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchTerm, setSearchTerm] = React.useState(initialSearch);
   const [page, setPage] = React.useState(1);
   const [perPage, setPerPage] = React.useState(100);
+  
+  // Sync with parent search term
+  React.useEffect(() => {
+    setSearchTerm(initialSearch);
+    setPage(1);
+  }, [initialSearch]);
 
   const stopPerfMonitor = usePerformanceMonitor('ServersTab');
 
