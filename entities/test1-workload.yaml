@@ -11,7 +11,7 @@ metadata:
     mcp-catalog.io/version: "1.0.0"
     backstage.io/techdocs-ref: dir:.
 spec:
-  type: service
+  type: mcp-workload
   lifecycle: experimental
   owner: platform-team
   system: data-platform
@@ -44,7 +44,7 @@ metadata:
   annotations:
     mcp-catalog.io/version: "1.0.0"
 spec:
-  type: workflow
+  type: mcp-workload
   lifecycle: experimental
   owner: security-team
   system: compliance-platform
