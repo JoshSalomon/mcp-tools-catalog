@@ -1,0 +1,278 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: k8s-list-pods
+  namespace: default
+  description: "List pods in a Kubernetes namespace with optional label filtering"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: kubernetes-mcp
+    mcp-catalog.io/category: pods
+spec:
+  type: mcp-tool
+  lifecycle: production
+  owner: ops-team
+  subcomponentOf: component:default/kubernetes-mcp
+  mcp:
+    toolType: query
+    inputSchema:
+      type: object
+      properties:
+        namespace:
+          type: string
+          description: "Kubernetes namespace (defaults to 'default')"
+        labelSelector:
+          type: string
+          description: "Label selector (e.g., 'app=nginx,env=prod')"
+        fieldSelector:
+          type: string
+          description: "Field selector (e.g., 'status.phase=Running')"
+        limit:
+          type: integer
+          default: 100
+          description: "Maximum number of pods to return"
+    outputSchema:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          namespace:
+            type: string
+          status:
+            type: string
+          ready:
+            type: string
+          restarts:
+            type: integer
+          age:
+            type: string
+          node:
+            type: string
+    capabilities:
+      - read
+      - list
+      - pods
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: k8s-get-pod-logs
+  namespace: default
+  description: "Retrieve logs from a specific pod container"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: kubernetes-mcp
+    mcp-catalog.io/category: pods
+spec:
+  type: mcp-tool
+  lifecycle: production
+  owner: ops-team
+  subcomponentOf: component:default/kubernetes-mcp
+  mcp:
+    toolType: query
+    inputSchema:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "Pod name"
+        namespace:
+          type: string
+          default: "default"
+          description: "Kubernetes namespace"
+        container:
+          type: string
+          description: "Container name (required for multi-container pods)"
+        tailLines:
+          type: integer
+          default: 100
+          description: "Number of lines from the end of logs to retrieve"
+        since:
+          type: string
+          description: "Only return logs newer than this duration (e.g., '1h', '30m')"
+        previous:
+          type: boolean
+          default: false
+          description: "Return logs from previous container instance"
+      required:
+        - name
+    outputSchema:
+      type: object
+      properties:
+        logs:
+          type: string
+          description: "Container log output"
+        container:
+          type: string
+        truncated:
+          type: boolean
+    capabilities:
+      - read
+      - logs
+      - pods
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: k8s-scale-deployment
+  namespace: default
+  description: "Scale a Kubernetes deployment to a specified number of replicas"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: kubernetes-mcp
+    mcp-catalog.io/category: deployments
+spec:
+  type: mcp-tool
+  lifecycle: production
+  owner: ops-team
+  subcomponentOf: component:default/kubernetes-mcp
+  mcp:
+    toolType: mutation
+    inputSchema:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "Deployment name"
+        namespace:
+          type: string
+          default: "default"
+          description: "Kubernetes namespace"
+        replicas:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: "Desired number of replicas"
+      required:
+        - name
+        - replicas
+    outputSchema:
+      type: object
+      properties:
+        name:
+          type: string
+        namespace:
+          type: string
+        previousReplicas:
+          type: integer
+        currentReplicas:
+          type: integer
+        status:
+          type: string
+    capabilities:
+      - write
+      - scale
+      - deployments
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: k8s-describe-resource
+  namespace: default
+  description: "Get detailed information about any Kubernetes resource"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: kubernetes-mcp
+    mcp-catalog.io/category: resources
+spec:
+  type: mcp-tool
+  lifecycle: production
+  owner: ops-team
+  subcomponentOf: component:default/kubernetes-mcp
+  mcp:
+    toolType: query
+    inputSchema:
+      type: object
+      properties:
+        kind:
+          type: string
+          description: "Resource kind (e.g., 'pod', 'deployment', 'service')"
+        name:
+          type: string
+          description: "Resource name"
+        namespace:
+          type: string
+          default: "default"
+          description: "Kubernetes namespace"
+      required:
+        - kind
+        - name
+    outputSchema:
+      type: object
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          type: object
+        spec:
+          type: object
+        status:
+          type: object
+    capabilities:
+      - read
+      - describe
+      - resources
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: k8s-apply-manifest
+  namespace: default
+  description: "Apply a Kubernetes manifest (YAML) to the cluster"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: kubernetes-mcp
+    mcp-catalog.io/category: resources
+spec:
+  type: mcp-tool
+  lifecycle: production
+  owner: ops-team
+  subcomponentOf: component:default/kubernetes-mcp
+  mcp:
+    toolType: mutation
+    inputSchema:
+      type: object
+      properties:
+        manifest:
+          type: string
+          description: "YAML manifest content"
+        namespace:
+          type: string
+          description: "Target namespace (overrides manifest namespace)"
+        dryRun:
+          type: boolean
+          default: false
+          description: "Validate without applying changes"
+        force:
+          type: boolean
+          default: false
+          description: "Force apply even if resource exists"
+      required:
+        - manifest
+    outputSchema:
+      type: object
+      properties:
+        created:
+          type: array
+          items:
+            type: string
+        updated:
+          type: array
+          items:
+            type: string
+        unchanged:
+          type: array
+          items:
+            type: string
+        errors:
+          type: array
+          items:
+            type: string
+    capabilities:
+      - write
+      - apply
+      - resources

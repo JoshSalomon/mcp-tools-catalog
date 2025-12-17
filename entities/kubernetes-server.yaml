@@ -1,0 +1,35 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: kubernetes-mcp
+  namespace: default
+  description: "MCP server for Kubernetes cluster operations - manage pods, deployments, and services"
+  labels:
+    mcp-catalog.io/type: server
+    mcp-catalog.io/category: infrastructure
+  annotations:
+    mcp-catalog.io/version: "1.5.0"
+    kubernetes.io/cluster: "production"
+spec:
+  type: mcp-server
+  lifecycle: production
+  owner: ops-team
+  system: infrastructure-platform
+  mcp:
+    serverType: stdio
+    endpoint: "npx -y @modelcontextprotocol/server-kubernetes"
+    version: "1.5.0"
+    capabilities:
+      - tools
+      - resources
+    authentication:
+      type: kubeconfig
+      envVar: KUBECONFIG
+    permissions:
+      - pods:read
+      - pods:exec
+      - deployments:read
+      - deployments:write
+      - services:read
+      - configmaps:read
+      - secrets:read
