@@ -1,10 +1,30 @@
 import { useState, useEffect } from 'react';
 import { Entity } from '@backstage/catalog-model';
 
-// This URL should be configured via environment or Console configuration
-// Adding /api/catalog here to match RHDH standard API path
+/**
+ * Backstage Catalog API proxy endpoint.
+ * This URL is configured to proxy requests through the OpenShift Console
+ * to the Backstage backend's catalog API.
+ */
 const CATALOG_PROXY_ENDPOINT = '/api/proxy/plugin/mcp-catalog/backstage/api/catalog';
 
+/**
+ * React hook for fetching multiple entities from the Backstage Catalog.
+ * 
+ * @template T - Entity type extending Backstage Entity
+ * @param kind - The entity kind to filter by (e.g., 'Component')
+ * @param type - Optional spec.type to filter by (e.g., 'mcp-server', 'mcp-tool')
+ * @param namespace - Optional namespace to filter by
+ * @returns Tuple of [entities array, loaded boolean, error or null]
+ * 
+ * @example
+ * ```tsx
+ * const [servers, loaded, error] = useCatalogEntities<CatalogMcpServer>(
+ *   'Component',
+ *   'mcp-server'
+ * );
+ * ```
+ */
 export const useCatalogEntities = <T extends Entity>(
   kind: string,
   type?: string,
@@ -73,6 +93,24 @@ export const useCatalogEntities = <T extends Entity>(
   return [data, loaded, error];
 };
 
+/**
+ * React hook for fetching a single entity from the Backstage Catalog by name.
+ * 
+ * @template T - Entity type extending Backstage Entity
+ * @param kind - The entity kind (e.g., 'Component')
+ * @param name - The entity name
+ * @param namespace - The entity namespace (defaults to 'default')
+ * @returns Tuple of [entity or null, loaded boolean, error or null]
+ * 
+ * @example
+ * ```tsx
+ * const [server, loaded, error] = useCatalogEntity<CatalogMcpServer>(
+ *   'Component',
+ *   'my-server',
+ *   'default'
+ * );
+ * ```
+ */
 export const useCatalogEntity = <T extends Entity>(
   kind: string,
   name: string,
@@ -84,6 +122,15 @@ export const useCatalogEntity = <T extends Entity>(
 
   useEffect(() => {
     let mounted = true;
+    
+    // Skip fetching for placeholder or invalid names
+    if (!name || name === '__placeholder__' || name.startsWith('__')) {
+      if (mounted) {
+        setData(null);
+        setLoaded(true);
+      }
+      return;
+    }
     
     const fetchData = async () => {
       try {

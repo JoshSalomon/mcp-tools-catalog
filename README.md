@@ -18,6 +18,9 @@ The MCP Tools Catalog extends Backstage with three new entity types to provide c
 - **🚀 Integration**: Seamless integration with Backstage catalog and authentication
 - **📊 Management**: Manage workload-tool relationships through intuitive UI
 - **🏗️ Vanilla OpenShift Ready**: Works on upstream Backstage and standard OpenShift without proprietary extensions
+- **🔎 Global Search**: Search across all entity types with URL persistence
+- **♿ Accessibility**: Full ARIA labels, keyboard navigation, and screen reader support
+- **📦 One-Command Deploy**: Build, push, deploy, and test with a single script
 
 ## 🧭 Constitution Alignment
 
@@ -330,12 +333,16 @@ MCP_REGISTRY_API_KEY=${MCP_REGISTRY_API_KEY}
 - [x] Source of truth behavior (GitHub overwrites Backstage)
 - [x] Automatic sync and retry mechanisms
 
-### 📋 Phase 6: Polish & Production Readiness
-- [ ] Unit tests for all components
+### 🔄 Phase 6: Polish & Production Readiness
+- [x] Loading states and error boundaries
+- [x] Breadcrumb navigation
+- [x] Global search with URL persistence
+- [x] Entity type filter chips
+- [x] Collapsible server sections in workload details
+- [x] Accessibility improvements (ARIA labels, keyboard nav)
+- [x] Unit tests for ServersTab, searchService, validationService
+- [ ] Unit tests for remaining components
 - [ ] Integration tests (Cypress)
-- [ ] Loading states and error boundaries
-- [ ] Breadcrumb navigation
-- [ ] Accessibility improvements (ARIA labels, keyboard nav)
 
 ### 🔮 Future Enhancements
 - [ ] Real-time MCP server health monitoring

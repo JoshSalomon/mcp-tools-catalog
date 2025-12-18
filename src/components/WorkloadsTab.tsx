@@ -84,7 +84,7 @@ const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
     });
   }, [allEntities]);
 
-  // Get tool references from a workload
+  // Get tool references from a workload (deduplicated by tool name)
   const getWorkloadToolRefs = (workload: CatalogMcpWorkload): string[] => {
     const refs: string[] = [];
     
@@ -93,19 +93,36 @@ const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
       refs.push(...workload.spec.consumes);
     }
     
+    // Check spec.dependsOn array (standard Backstage field)
+    if (workload.spec.dependsOn) {
+      refs.push(...workload.spec.dependsOn);
+    }
+    
     // Check spec.mcp.tools array
     if ((workload.spec as any).mcp?.tools) {
       refs.push(...(workload.spec as any).mcp.tools);
     }
     
-    // Check relations for consumesApi
-    if (workload.relations) {
+    // Check relations for dependsOn (only if spec.dependsOn is not present to avoid duplicates)
+    if (!workload.spec.dependsOn && workload.relations) {
       workload.relations
-        .filter(rel => rel.type === 'consumesApi' || rel.type === 'dependsOn')
+        .filter(rel => rel.type === 'dependsOn')
         .forEach(rel => refs.push(rel.targetRef));
     }
     
-    return refs;
+    // Deduplicate by extracting tool names and keeping unique entries
+    const uniqueToolNames = new Set<string>();
+    const uniqueRefs: string[] = [];
+    
+    refs.forEach(ref => {
+      const toolName = getEntityName(ref);
+      if (toolName && !uniqueToolNames.has(toolName)) {
+        uniqueToolNames.add(toolName);
+        uniqueRefs.push(ref);
+      }
+    });
+    
+    return uniqueRefs;
   };
 
   // Get unique tool names for filter dropdown (from workload references)
@@ -217,6 +234,7 @@ const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
                 setSearchTerm('');
                 setPage(1);
               }}
+              aria-label="Search MCP workloads by name or description"
             />
           </ToolbarItem>
           <ToolbarItem>
@@ -225,7 +243,7 @@ const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
               isVisible={isToolFilterOpen}
               shouldClose={() => setIsToolFilterOpen(false)}
               bodyContent={
-                <Menu>
+                <Menu aria-label="Select tool filter">
                   <MenuContent>
                     <MenuList>
                       <MenuItem onClick={() => onToolFilterSelect('All Tools')}>
@@ -241,7 +259,13 @@ const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
                 </Menu>
               }
             >
-              <Button variant="secondary" onClick={onToolFilterToggle}>
+              <Button 
+                variant="secondary" 
+                onClick={onToolFilterToggle}
+                aria-label={`Filter by tool: ${toolFilter || 'All tools'}`}
+                aria-expanded={isToolFilterOpen}
+                aria-haspopup="listbox"
+              >
                 Tool: {toolFilter || 'All'}
               </Button>
             </Popover>

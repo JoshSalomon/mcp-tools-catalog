@@ -16,10 +16,14 @@ import {
   EmptyStateBody,
   Alert,
   ExpandableSection,
+  Button,
+  Flex,
+  FlexItem,
 } from '@patternfly/react-core';
 import { CubeIcon, WrenchIcon, ServerIcon } from '@patternfly/react-icons';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { usePerformanceMonitor } from '../utils/performanceMonitor';
+import { Breadcrumbs, createMcpCatalogBreadcrumbs } from './shared/Breadcrumbs';
 import { CatalogMcpWorkload, CATALOG_MCP_WORKLOAD_KIND } from '../models/CatalogMcpWorkload';
 import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE } from '../models/CatalogMcpTool';
 import { CatalogMcpServer, CATALOG_MCP_SERVER_KIND, CATALOG_MCP_SERVER_TYPE } from '../models/CatalogMcpServer';
@@ -184,6 +188,38 @@ const McpWorkloadPage: React.FC = () => {
     return servers.some(s => s.metadata.name === serverName);
   };
 
+  // Track which server sections are expanded (default: all expanded)
+  const [expandedServers, setExpandedServers] = React.useState<Set<string>>(new Set());
+  const [initialized, setInitialized] = React.useState(false);
+
+  // Initialize all servers as expanded when data loads
+  React.useEffect(() => {
+    if (toolsByServer.length > 0 && !initialized) {
+      setExpandedServers(new Set(toolsByServer.map(([serverName]) => serverName)));
+      setInitialized(true);
+    }
+  }, [toolsByServer, initialized]);
+
+  const toggleServerExpanded = (serverName: string) => {
+    setExpandedServers(prev => {
+      const next = new Set(prev);
+      if (next.has(serverName)) {
+        next.delete(serverName);
+      } else {
+        next.add(serverName);
+      }
+      return next;
+    });
+  };
+
+  const expandAllServers = () => {
+    setExpandedServers(new Set(toolsByServer.map(([serverName]) => serverName)));
+  };
+
+  const collapseAllServers = () => {
+    setExpandedServers(new Set());
+  };
+
   if (!workloadLoaded || !toolsLoaded || !serversLoaded) {
     return (
       <Bullseye>
@@ -224,6 +260,9 @@ const McpWorkloadPage: React.FC = () => {
 
   return (
     <>
+      <PageSection>
+        <Breadcrumbs items={createMcpCatalogBreadcrumbs('workload', workload.metadata.name)} />
+      </PageSection>
       <PageSection>
         <Title headingLevel="h1" size="lg">
           MCP Workload: {workload.metadata.name}
@@ -307,9 +346,23 @@ const McpWorkloadPage: React.FC = () => {
       <PageSection>
         <Card>
           <CardBody>
-            <Title headingLevel="h2" size="md" style={{ marginBottom: '1rem' }}>
-              Referenced Tools ({referencedTools.length}) - Grouped by Server
-            </Title>
+            <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }} style={{ marginBottom: '1rem' }}>
+              <FlexItem>
+                <Title headingLevel="h2" size="md">
+                  Referenced Tools ({referencedTools.length}) - Grouped by Server
+                </Title>
+              </FlexItem>
+              {toolsByServer.length > 1 && (
+                <FlexItem>
+                  <Button variant="link" onClick={expandAllServers} style={{ marginRight: '0.5rem' }}>
+                    Expand All
+                  </Button>
+                  <Button variant="link" onClick={collapseAllServers}>
+                    Collapse All
+                  </Button>
+                </FlexItem>
+              )}
+            </Flex>
             {referencedTools.length === 0 ? (
               <EmptyState variant="xs" icon={WrenchIcon}>
                 <Title headingLevel="h4" size="md">
@@ -334,7 +387,8 @@ const McpWorkloadPage: React.FC = () => {
                       )}
                     </span>
                   }
-                  isExpanded
+                  isExpanded={expandedServers.has(serverName)}
+                  onToggle={() => toggleServerExpanded(serverName)}
                   style={{ marginBottom: '1rem' }}
                 >
                   <div style={{ paddingLeft: '1rem' }}>

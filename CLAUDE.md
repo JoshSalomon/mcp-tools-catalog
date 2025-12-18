@@ -1,6 +1,6 @@
 # mcp-tools-catalog Development Guidelines
 
-Last updated: 2025-12-16
+Last updated: 2025-12-11
 
 ## Active Technologies
 - TypeScript 4.7+, Node.js 18+
@@ -8,6 +8,7 @@ Last updated: 2025-12-16
 - @openshift-console/dynamic-plugin-sdk 1.4.0
 - @patternfly/react-core 6.2+
 - @backstage/catalog-model ^1.7.5 (peerDependency)
+- Jest + React Testing Library for unit tests
 - Backstage catalog backend (existing) - no additional storage required
 
 ## Project Structure
@@ -15,17 +16,19 @@ Last updated: 2025-12-16
 ```text
 src/
 ├── components/           # React components
-│   ├── McpCatalogPage.tsx      # Main catalog page with tabs
+│   ├── McpCatalogPage.tsx      # Main catalog page with tabs + global search
 │   ├── McpServerPage.tsx       # Server detail page
 │   ├── McpToolPage.tsx         # Tool detail page
-│   ├── McpWorkloadPage.tsx     # Workload detail page
+│   ├── McpWorkloadPage.tsx     # Workload detail page (collapsible sections)
 │   ├── ServersTab.tsx          # Servers list tab
 │   ├── ToolsTab.tsx            # Tools list tab
 │   ├── WorkloadsTab.tsx        # Workloads list tab
 │   └── shared/                 # Shared components
 │       ├── Pagination.tsx
 │       ├── OfflineIndicator.tsx
-│       └── DependencyTreeView.tsx
+│       ├── DependencyTreeView.tsx
+│       ├── Breadcrumbs.tsx
+│       └── ErrorBoundary.tsx
 ├── models/               # TypeScript interfaces
 │   ├── CatalogMcpServer.ts
 │   ├── CatalogMcpTool.ts
@@ -41,6 +44,7 @@ src/
 entities/                 # Example Backstage entity YAML files
 charts/                   # Helm charts for deployment
 specs/                    # Design documentation
+tests/sanity/             # Sanity test scripts
 ```
 
 ## Commands
@@ -49,11 +53,18 @@ specs/                    # Design documentation
 # Build
 yarn build
 
-# Build container
+# Run unit tests
+yarn test
+
+# Build, push, deploy, and test (one command)
+./build-push-deploy-test.sh
+
+# Build container only
 ./build-container.sh --local
 
-# Deploy to OpenShift
-./push-and-deploy.sh
+# Sanity tests (against deployed cluster)
+./tests/sanity/quick-check.sh        # Quick health check
+./tests/sanity/run-sanity-tests.sh   # Full test suite
 
 # Lint
 yarn lint
@@ -94,7 +105,22 @@ All MCP entities are standard Backstage `Component` kind:
 - ✅ Phase 3: Explore MCP Tools (User Story 2)
 - ✅ Phase 4: Manage MCP Workloads (User Story 3)
 - ✅ Phase 5: GitHub Catalog Integration (User Story 4 - Documentation)
-- 📋 Phase 6: Polish & Production Readiness (pending)
+- 🔄 Phase 6: Polish & Production Readiness (in progress)
+  - ✅ Loading states, error boundaries, empty states
+  - ✅ Breadcrumb navigation
+  - ✅ Entity type filters and global search
+  - ✅ Accessibility (ARIA labels, keyboard navigation)
+  - ✅ Unit tests (ServersTab, searchService, validationService)
+  - 📋 Remaining unit tests (6 components)
+  - 📋 Integration tests (Cypress)
+
+## UI Features
+
+- **Global Search**: Syncs across all tabs, persisted in URL
+- **Entity Type Filters**: Quick filter chips for Servers/Tools/Workloads
+- **Collapsible Sections**: Workload detail page allows collapsing server tool lists
+- **Expand/Collapse All**: Bulk toggle for multi-server workloads
+- **Accessibility**: ARIA labels, keyboard navigation, screen reader support
 
 ## Important Notes
 
@@ -102,3 +128,4 @@ All MCP entities are standard Backstage `Component` kind:
 - All data comes from Backstage Catalog API via console proxy
 - Locale files must match plugin name: `locales/en/plugin__mcp-catalog.json`
 - Container runs as non-root user on UBI9 nginx base image
+- Unit tests use Jest + React Testing Library

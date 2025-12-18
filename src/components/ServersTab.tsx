@@ -120,6 +120,7 @@ const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
                 setSearchTerm('');
                 setPage(1);
               }}
+              aria-label="Search MCP servers by name or description"
             />
           </ToolbarItem>
           <ToolbarItem variant="pagination">

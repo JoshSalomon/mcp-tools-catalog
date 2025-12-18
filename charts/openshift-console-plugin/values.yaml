@@ -24,6 +24,9 @@ plugin:
     requests:
       cpu: 10m
       memory: 50Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
   basePath: /
   certificateSecretName: ""
   

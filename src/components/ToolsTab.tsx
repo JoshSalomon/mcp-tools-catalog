@@ -199,6 +199,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
                 setSearchTerm('');
                 setPage(1);
               }}
+              aria-label="Search MCP tools by name or description"
             />
           </ToolbarItem>
           <ToolbarItem>
@@ -207,7 +208,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
               isVisible={isServerFilterOpen}
               shouldClose={() => setIsServerFilterOpen(false)}
               bodyContent={
-                <Menu>
+                <Menu aria-label="Select server filter">
                   <MenuContent>
                     <MenuList>
                       <MenuItem onClick={() => onServerFilterSelect('All Servers')}>
@@ -223,7 +224,13 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
                 </Menu>
               }
             >
-              <Button variant="secondary" onClick={onServerFilterToggle}>
+              <Button 
+                variant="secondary" 
+                onClick={onServerFilterToggle}
+                aria-label={`Filter by server: ${serverFilter || 'All servers'}`}
+                aria-expanded={isServerFilterOpen}
+                aria-haspopup="listbox"
+              >
                 Server: {serverFilter || 'All'}
               </Button>
             </Popover>

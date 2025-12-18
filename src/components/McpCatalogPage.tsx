@@ -114,14 +114,19 @@ const McpCatalogPage: React.FC = () => {
                 aria-label="Global search"
               />
             </ToolbarItem>
-            <ToolbarGroup variant="filter-group">
+            <ToolbarGroup variant="filter-group" aria-label="Entity type filters">
               <ToolbarItem>
-                <LabelGroup categoryName="Filter by type">
+                <LabelGroup categoryName="Filter by type" aria-label="Filter entities by type">
                   <Label
                     color={activeTab === 'server' ? 'blue' : 'grey'}
                     icon={<ServerIcon />}
                     onClick={() => handleTypeFilter('server')}
+                    onKeyDown={(e) => e.key === 'Enter' && handleTypeFilter('server')}
                     style={{ cursor: 'pointer' }}
+                    tabIndex={0}
+                    role="button"
+                    aria-pressed={activeTab === 'server'}
+                    aria-label="Filter by servers"
                   >
                     Servers
                   </Label>
@@ -129,7 +134,12 @@ const McpCatalogPage: React.FC = () => {
                     color={activeTab === 'tool' ? 'blue' : 'grey'}
                     icon={<WrenchIcon />}
                     onClick={() => handleTypeFilter('tool')}
+                    onKeyDown={(e) => e.key === 'Enter' && handleTypeFilter('tool')}
                     style={{ cursor: 'pointer' }}
+                    tabIndex={0}
+                    role="button"
+                    aria-pressed={activeTab === 'tool'}
+                    aria-label="Filter by tools"
                   >
                     Tools
                   </Label>
@@ -137,7 +147,12 @@ const McpCatalogPage: React.FC = () => {
                     color={activeTab === 'workload' ? 'blue' : 'grey'}
                     icon={<CubeIcon />}
                     onClick={() => handleTypeFilter('workload')}
+                    onKeyDown={(e) => e.key === 'Enter' && handleTypeFilter('workload')}
                     style={{ cursor: 'pointer' }}
+                    tabIndex={0}
+                    role="button"
+                    aria-pressed={activeTab === 'workload'}
+                    aria-label="Filter by workloads"
                   >
                     Workloads
                   </Label>

@@ -32,6 +32,24 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.plugin.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /plugin-manifest.json
+              port: {{ .Values.plugin.port }}
+              scheme: HTTPS
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /plugin-manifest.json
+              port: {{ .Values.plugin.port }}
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           volumeMounts:
             - name: {{ template "openshift-console-plugin.certificateSecret" . }}
               readOnly: true

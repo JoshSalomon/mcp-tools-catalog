@@ -20,6 +20,7 @@ import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { filterToolsByServer } from '../services/searchService';
 import { usePerformanceMonitor } from '../utils/performanceMonitor';
 import { OfflineIndicator } from './shared/OfflineIndicator';
+import { Breadcrumbs, createMcpCatalogBreadcrumbs } from './shared/Breadcrumbs';
 import { CatalogMcpServer, CATALOG_MCP_SERVER_KIND } from '../models/CatalogMcpServer';
 import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE } from '../models/CatalogMcpTool';
 import { useCatalogEntity, useCatalogEntities } from '../services/catalogService';
@@ -39,12 +40,6 @@ const McpServerPage: React.FC = () => {
   // Try params first, then fall back to pathname parsing
   const name = params.name || extractNameFromPath(location.pathname);
   
-  // Debug logging
-  React.useEffect(() => {
-    console.log('McpServerPage - params:', params);
-    console.log('McpServerPage - pathname:', location.pathname);
-    console.log('McpServerPage - extracted name:', name);
-  }, [params, location.pathname, name]);
   
   const searchParams = new URLSearchParams(location.search);
   const namespace = searchParams.get('namespace') || 'default';
@@ -98,8 +93,6 @@ const McpServerPage: React.FC = () => {
           </Title>
           <EmptyStateBody>
             No server name provided in the URL. Please navigate from the servers list.
-            <br />
-            <small>Debug: params = {JSON.stringify(params)}, pathname = {location.pathname}</small>
           </EmptyStateBody>
         </EmptyState>
       </PageSection>
@@ -126,6 +119,9 @@ const McpServerPage: React.FC = () => {
 
   return (
     <>
+      <PageSection>
+        <Breadcrumbs items={createMcpCatalogBreadcrumbs('server', server.metadata.name)} />
+      </PageSection>
       <PageSection>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Title headingLevel="h1" size="lg">

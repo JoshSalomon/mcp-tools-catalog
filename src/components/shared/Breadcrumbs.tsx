@@ -47,26 +47,32 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
   };
 
   return (
-    <Breadcrumb>
-      {items.map((item, index) => {
-        const isLast = index === items.length - 1;
-        
-        return (
-          <BreadcrumbItem
-            key={index}
-            isActive={isLast}
-          >
-            {item.path && !isLast ? (
-              <a href="#" onClick={(e) => handleClick(item.path, e)}>
-                {item.label}
-              </a>
-            ) : (
-              item.label
-            )}
-          </BreadcrumbItem>
-        );
-      })}
-    </Breadcrumb>
+    <nav aria-label="Breadcrumb navigation">
+      <Breadcrumb>
+        {items.map((item, index) => {
+          const isLast = index === items.length - 1;
+          
+          return (
+            <BreadcrumbItem
+              key={index}
+              isActive={isLast}
+            >
+              {item.path && !isLast ? (
+                <a 
+                  href="#" 
+                  onClick={(e) => handleClick(item.path, e)}
+                  aria-label={`Navigate to ${item.label}`}
+                >
+                  {item.label}
+                </a>
+              ) : (
+                <span aria-current={isLast ? 'page' : undefined}>{item.label}</span>
+              )}
+            </BreadcrumbItem>
+          );
+        })}
+      </Breadcrumb>
+    </nav>
   );
 };
 

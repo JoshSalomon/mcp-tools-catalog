@@ -19,6 +19,7 @@ import {
 import { WrenchIcon, ServerIcon, CubeIcon } from '@patternfly/react-icons';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { usePerformanceMonitor } from '../utils/performanceMonitor';
+import { Breadcrumbs, createMcpCatalogBreadcrumbs } from './shared/Breadcrumbs';
 import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND } from '../models/CatalogMcpTool';
 import { CatalogMcpServer, CATALOG_MCP_SERVER_KIND } from '../models/CatalogMcpServer';
 import { CatalogMcpWorkload, CATALOG_MCP_WORKLOAD_KIND } from '../models/CatalogMcpWorkload';
@@ -199,6 +200,9 @@ const McpToolPage: React.FC = () => {
 
   return (
     <>
+      <PageSection>
+        <Breadcrumbs items={createMcpCatalogBreadcrumbs('tool', tool.metadata.name)} />
+      </PageSection>
       <PageSection>
         <Title headingLevel="h1" size="lg">
           MCP Tool: {hierarchicalName}

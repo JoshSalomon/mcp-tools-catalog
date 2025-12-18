@@ -1,0 +1,1 @@
+export { McpToolPage } from './McpToolPage';

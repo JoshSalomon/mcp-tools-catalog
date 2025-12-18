@@ -1,0 +1,1 @@
+export { McpCatalogPage } from './McpCatalogPage';

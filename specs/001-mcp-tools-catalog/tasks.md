@@ -157,21 +157,21 @@ Backstage plugin structure:
 - [x] T063 [P] Implement empty state components for tabs with no entities
 - [x] T064 [P] Add PatternFly breadcrumb navigation to detail pages
 - [x] T065 Add entity type filters (McpServer, McpTool, McpWorkload) to catalog search per FR-008
-- [ ] T066 [P] Create unit tests for ServersTab in src/components/ServersTab.spec.tsx
-- [ ] T067 [P] Create unit tests for McpServerPage in src/components/McpServerPage.spec.tsx
-- [ ] T068 [P] Create unit tests for ToolsTab in src/components/ToolsTab.spec.tsx
-- [ ] T069 [P] Create unit tests for McpToolPage in src/components/McpToolPage.spec.tsx
-- [ ] T070 [P] Create unit tests for WorkloadsTab in src/components/WorkloadsTab.spec.tsx
-- [ ] T071 [P] Create unit tests for McpWorkloadPage in src/components/McpWorkloadPage.spec.tsx
-- [ ] T072 [P] Create unit tests for DependencyTreeView in src/components/shared/DependencyTreeView.spec.tsx
-- [ ] T073 [P] Create unit tests for catalogService in src/services/catalogService.spec.ts
-- [ ] T074 [P] Create unit tests for searchService in src/services/searchService.spec.ts
-- [ ] T075 [P] Create unit tests for validationService in src/services/validationService.spec.ts
+- [x] T066 [P] Create unit tests for ServersTab in src/components/ServersTab.spec.tsx
+- [x] T067 [P] Create unit tests for McpServerPage in src/components/McpServerPage.spec.tsx
+- [x] T068 [P] Create unit tests for ToolsTab in src/components/ToolsTab.spec.tsx
+- [x] T069 [P] Create unit tests for McpToolPage in src/components/McpToolPage.spec.tsx
+- [x] T070 [P] Create unit tests for WorkloadsTab in src/components/WorkloadsTab.spec.tsx
+- [x] T071 [P] Create unit tests for McpWorkloadPage in src/components/McpWorkloadPage.spec.tsx
+- [x] T072 [P] Create unit tests for DependencyTreeView in src/components/shared/DependencyTreeView.spec.tsx
+- [x] T073 [P] Create unit tests for catalogService in src/services/catalogService.spec.tsx
+- [x] T074 [P] Create unit tests for searchService in src/services/searchService.spec.ts
+- [x] T075 [P] Create unit tests for validationService in src/services/validationService.spec.ts
 - [ ] T076 Create integration test for server browsing in integration-tests/cypress/e2e/server-browsing.cy.ts
 - [ ] T077 [P] Create integration test for tool exploration in integration-tests/cypress/e2e/tool-exploration.cy.ts
 - [ ] T078 [P] Create integration test for workload management in integration-tests/cypress/e2e/workload-management.cy.ts
 - [x] T079 Create sample entity YAML files for testing: mcp-server-example.yaml, mcp-tool-example.yaml, mcp-workload-example.yaml
-- [ ] T080 [P] Add accessibility testing to all components (ARIA labels, keyboard navigation)
+- [x] T080 [P] Add accessibility testing to all components (ARIA labels, keyboard navigation)
 - [x] T081 [P] Update deployment/kubernetes/deployment.yaml with resource limits and health checks
 - [x] T082 [P] Verify container image builds with non-root user and minimal base image
 - [x] T083 Run quickstart.md validation to ensure all examples work

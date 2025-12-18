@@ -1,7 +1,26 @@
+/**
+ * Search and filtering utilities for MCP Catalog entities.
+ * @module searchService
+ */
+
 import { Entity } from '@backstage/catalog-model';
 import { CatalogMcpTool } from '../models/CatalogMcpTool';
 import { getEntityName } from '../utils/hierarchicalNaming';
 
+/**
+ * Filters an array of entities by a search term.
+ * Searches across name, namespace, description, labels, and tags.
+ * 
+ * @template T - Entity type extending Backstage Entity
+ * @param resources - Array of entities to filter
+ * @param searchTerm - Search term to match against entity metadata
+ * @returns Filtered array of entities matching the search term
+ * 
+ * @example
+ * ```ts
+ * const filtered = filterResources(servers, 'production');
+ * ```
+ */
 export const filterResources = <T extends Entity>(resources: T[], searchTerm: string): T[] => {
   if (!searchTerm) return resources;
   const lowerTerm = searchTerm.toLowerCase();
@@ -60,6 +79,19 @@ const getToolServerName = (tool: CatalogMcpTool): string | null => {
   return tool.metadata.labels?.['mcp-catalog.io/server'] || null;
 };
 
+/**
+ * Filters tools to only those belonging to a specific server.
+ * Uses the tool's subcomponentOf, partOf, relations, or label to determine server membership.
+ * 
+ * @param tools - Array of tool entities to filter
+ * @param serverName - Name of the server to filter by
+ * @returns Filtered array of tools belonging to the specified server
+ * 
+ * @example
+ * ```ts
+ * const serverTools = filterToolsByServer(allTools, 'my-mcp-server');
+ * ```
+ */
 export const filterToolsByServer = (tools: CatalogMcpTool[], serverName: string): CatalogMcpTool[] => {
   return tools.filter(tool => {
     const toolServerName = getToolServerName(tool);

@@ -322,7 +322,7 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
   }
 
   return (
-    <div>
+    <div role="region" aria-label="Dependency tree view">
       <Toolbar>
         <ToolbarContent>
           <ToolbarItem>
@@ -332,10 +332,15 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
               onChange={(_event, value) => setSearchTerm(value)}
               onClear={() => setSearchTerm('')}
               style={{ minWidth: '250px' }}
+              aria-label="Filter dependencies by name"
             />
           </ToolbarItem>
           <ToolbarItem>
-            <span style={{ color: '#666', fontSize: '0.875rem' }}>
+            <span 
+              style={{ color: '#666', fontSize: '0.875rem' }}
+              role="status"
+              aria-live="polite"
+            >
               {searchTerm && filteredItems[0]?.children?.length !== undefined
                 ? `Showing ${filteredItems[0]?.children?.reduce((acc, s) => acc + (s.children?.length || 0), 0) || 0} tools`
                 : `${toolRefs.length} total dependencies`}
@@ -358,6 +363,7 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
           data={filteredItems}
           hasGuides
           hasSelectableNodes={false}
+          aria-label="Workload dependency hierarchy"
         />
       )}
     </div>
