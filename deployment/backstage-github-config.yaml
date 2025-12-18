@@ -7,4 +7,4 @@ data:
   # Configure these values for your environment
   GITHUB_ORG: "JoshSalomon"
   GITHUB_REPO: "mcp-tools-catalog"
-  GITHUB_BRANCH: "001-mcp-tools-catalog"
+  GITHUB_BRANCH: "002-disable-tools-checkbox"
