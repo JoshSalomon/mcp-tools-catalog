@@ -1,0 +1,1 @@
+{"version":3,"file":"McpServerCard.d.ts","sourceRoot":"","sources":["../../../../src/components/McpServerCard/McpServerCard.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,OAAO,CAAC;AAE1B,OAAO,EAAE,MAAM,EAAE,MAAM,0BAA0B,CAAC;AAElD,MAAM,WAAW,kBAAkB;IACjC,MAAM,EAAE,MAAM,CAAC;CAChB;AAED,eAAO,MAAM,aAAa,eAAgB,kBAAkB,sBAgB3D,CAAC"}

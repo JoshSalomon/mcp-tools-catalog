@@ -1,0 +1,67 @@
+# Dependencies
+node_modules
+**/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+
+# Testing
+coverage
+.nyc_output
+
+# Build outputs (but keep root dist for Dockerfile.local)
+# dist  # Don't exclude - needed for Dockerfile.local
+dist-types
+build
+plugins/**/dist
+plugins/**/dist-types
+plugins/**/build
+*.tsbuildinfo
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Documentation
+*.md
+!README.md
+docs
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# OS files
+Thumbs.db
+
+# Integration tests
+integration-tests
+
+# Charts and deployment configs
+charts
+deployment
+
+# Development files
+.eslintcache
+*.log

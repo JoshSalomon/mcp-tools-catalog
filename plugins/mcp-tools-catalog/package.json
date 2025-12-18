@@ -1,0 +1,63 @@
+{
+  "name": "@internal/plugin-mcp-tools-catalog",
+  "version": "0.1.0",
+  "description": "Backstage plugin for MCP Tools Catalog",
+  "private": true,
+  "publishConfig": {
+    "access": "restricted",
+    "main": "dist/index.esm.js",
+    "types": "dist/index.d.ts"
+  },
+  "backstage": {
+    "role": "frontend-plugin",
+    "pluginId": "mcp-tools-catalog",
+    "pluginPackages": [
+      "@internal/plugin-mcp-tools-catalog"
+    ]
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "backstage-cli package build",
+    "start": "backstage-cli package start",
+    "lint": "backstage-cli package lint",
+    "test": "backstage-cli package test",
+    "clean": "backstage-cli package clean",
+    "prepack": "backstage-cli package prepack",
+    "postpack": "backstage-cli package postpack"
+  },
+  "dependencies": {
+    "@backstage/catalog-model": "^1.4.3",
+    "@backstage/core-components": "^0.13.8",
+    "@backstage/core-plugin-api": "^1.8.0",
+    "@backstage/plugin-catalog-react": "^1.9.2",
+    "@backstage/plugin-catalog-node": "^1.6.2",
+    "@backstage/config": "^1.1.1",
+    "@backstage/errors": "^1.2.3",
+    "@backstage/theme": "^0.5.0",
+    "@material-ui/core": "^4.12.2",
+    "@material-ui/icons": "^4.11.2",
+    "@material-ui/lab": "4.0.0-alpha.61",
+    "react": "^17.0.2",
+    "react-router-dom": "6.8.1",
+    "react-use": "^17.2.4"
+  },
+  "peerDependencies": {
+    "react": "^16.13.1 || ^17.0.0 || ^18.0.0",
+    "react-router-dom": "6.8.1"
+  },
+  "devDependencies": {
+    "@backstage/cli": "^0.25.0",
+    "@backstage/core-app-api": "^1.11.0",
+    "@backstage/dev-utils": "^1.0.21",
+    "@backstage/test-utils": "^1.4.7",
+    "@testing-library/jest-dom": "^5.10.1",
+    "@testing-library/react": "^12.1.3",
+    "@testing-library/user-event": "^14.0.0",
+    "@types/react": "^17.0.37",
+    "msw": "^1.0.0",
+    "typescript": "~5.3.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

@@ -1,0 +1,17 @@
+# Dockerfile.local - Build with locally-built artifacts
+# Use this when you have network issues or want faster builds
+#
+# Prerequisites: Run these commands first:
+#   1. cd plugins/mcp-tools-catalog && yarn install && yarn tsc && yarn build
+#   2. cd ../.. && yarn install && yarn build
+#
+# Then build with: podman build -f Dockerfile.local -t quay.io/your-org/mcp-tools-catalog:latest .
+
+FROM registry.access.redhat.com/ubi9/nginx-120:latest
+
+# Copy pre-built artifacts from local dist directory
+COPY --chown=1001:1001 dist /usr/share/nginx/html
+
+USER 1001
+
+ENTRYPOINT ["nginx", "-g", "daemon off;"]

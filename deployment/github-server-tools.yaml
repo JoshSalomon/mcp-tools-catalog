@@ -1,0 +1,77 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: list-repositories
+  namespace: default
+  description: "Retrieve GitHub repositories for an organization or user"
+  labels:
+    mcp-catalog.io/type: "tool"
+    mcp-catalog.io/server: "github-integration-server"
+    mcp-catalog.io/category: "repo-discovery"
+spec:
+  type: tool
+  lifecycle: production
+  owner: "group:platform-engineering"
+  mcp:
+    server: "component:default/github-integration-server"
+    toolType: "api-call"
+    inputSchema:
+      type: object
+      properties:
+        identifier:
+          type: string
+          description: "GitHub org or user login"
+        includePrivate:
+          type: boolean
+          description: "Return private repositories when authenticated"
+      required:
+        - identifier
+    capabilities:
+      - list
+      - github-api
+    parameters:
+      - identifier
+      - includePrivate
+relations:
+  - type: dependsOn
+    targetRef: "component:default/github-integration-server"
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: sync-project-board
+  namespace: default
+  description: "Sync GitHub project board items with issue labels and status"
+  labels:
+    mcp-catalog.io/type: "tool"
+    mcp-catalog.io/server: "github-integration-server"
+    mcp-catalog.io/category: "project-automation"
+spec:
+  type: tool
+  lifecycle: production
+  owner: "group:platform-engineering"
+  mcp:
+    server: "component:default/github-integration-server"
+    toolType: "workflow"
+    inputSchema:
+      type: object
+      properties:
+        projectUrl:
+          type: string
+          description: "GitHub project board URL"
+        statusMapping:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Map of board columns to desired issue labels"
+      required:
+        - projectUrl
+    capabilities:
+      - sync
+      - github-api
+    parameters:
+      - projectUrl
+      - statusMapping
+relations:
+  - type: dependsOn
+    targetRef: "component:default/github-integration-server"

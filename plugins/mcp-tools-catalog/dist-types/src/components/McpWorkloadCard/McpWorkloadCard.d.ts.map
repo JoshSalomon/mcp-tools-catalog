@@ -1,0 +1,1 @@
+{"version":3,"file":"McpWorkloadCard.d.ts","sourceRoot":"","sources":["../../../../src/components/McpWorkloadCard/McpWorkloadCard.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,OAAO,CAAC;AAE1B,OAAO,EAAE,MAAM,EAAE,MAAM,0BAA0B,CAAC;AAElD,MAAM,WAAW,oBAAoB;IACnC,MAAM,EAAE,MAAM,CAAC;CAChB;AAED,eAAO,MAAM,eAAe,eAAgB,oBAAoB,sBAgB/D,CAAC"}

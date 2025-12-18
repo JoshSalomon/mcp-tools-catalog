@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backstage
+  namespace: backstage
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backstage
+  template:
+    metadata:
+      labels:
+        app: backstage
+    spec:
+      containers:
+        - name: backstage
+          # Use versioned tags (v1, v2, etc.) to ensure OpenShift pulls fresh images
+          # Update this tag each time you rebuild the image
+          image: quay.io/jsalomon/backstage:v5
+          imagePullPolicy: Always
+          env:
+            # External URL for Backstage - must match the OpenShift route
+            - name: APP_BASE_URL
+              value: "https://backstage-backstage.apps.josh-ocp.192-168-122-253.sslip.io"
+            - name: APP_CONFIG_app_config_yaml
+              valueFrom:
+                configMapKeyRef:
+                  name: backstage-app-config
+                  key: app-config.production.yaml
+            - name: POSTGRES_HOST
+              value: backstage-postgres.backstage.svc.cluster.local
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              value: backstage
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-db
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: backstage
+          ports:
+            - containerPort: 7007
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: 7007
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+

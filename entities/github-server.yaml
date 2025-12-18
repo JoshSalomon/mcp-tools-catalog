@@ -1,0 +1,27 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: github-mcp
+  namespace: default
+  description: "MCP server for GitHub operations - manages repositories, issues, and pull requests"
+  labels:
+    mcp-catalog.io/type: server
+    mcp-catalog.io/category: devops
+  annotations:
+    mcp-catalog.io/version: "2.0.0"
+    github.com/project-slug: "modelcontextprotocol/servers"
+spec:
+  type: mcp-server
+  lifecycle: production
+  owner: platform-team
+  system: developer-platform
+  mcp:
+    serverType: stdio
+    endpoint: "npx -y @modelcontextprotocol/server-github"
+    version: "2.0.0"
+    capabilities:
+      - tools
+      - resources
+    authentication:
+      type: token
+      envVar: GITHUB_TOKEN

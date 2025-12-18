@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+# Deployment for the Backstage console proxy. Update the image field before applying.
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: backstage-console-proxy
+  labels:
+    app: backstage-console-proxy
+spec:
+  selector:
+    matchLabels:
+      app: backstage-console-proxy
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: backstage-console-proxy
+    spec:
+      containers:
+        - name: proxy
+          image: quay.io/REPLACE_ME/backstage-console-proxy:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TARGET_BASE_URL
+              value: http://backstage-mcp-catalog-test.rhdh-operator.svc.cluster.local
+            - name: AUTH_TOKEN_FILE
+              value: /var/run/secrets/backstage/token
+            - name: ALLOWED_PATH_PREFIXES
+              value: /api/catalog,/healthz
+            - name: TLS_CERT_FILE
+              value: /var/run/secrets/tls/tls.crt
+            - name: TLS_KEY_FILE
+              value: /var/run/secrets/tls/tls.key
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: proxy-token
+              mountPath: /var/run/secrets/backstage
+              readOnly: true
+            - name: proxy-tls
+              mountPath: /var/run/secrets/tls
+              readOnly: true
+      volumes:
+        - name: proxy-token
+          secret:
+            secretName: backstage-proxy-shared
+        - name: proxy-tls
+          secret:
+            secretName: backstage-console-proxy-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backstage-console-proxy
+  annotations:
+    service.alpha.openshift.io/serving-cert-secret-name: backstage-console-proxy-tls
+  labels:
+    app: backstage-console-proxy
+spec:
+  selector:
+    app: backstage-console-proxy
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: 8080

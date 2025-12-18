@@ -1,0 +1,61 @@
+# Backstage Production Configuration for MCP Tools Catalog
+# 
+# This file is applied as a ConfigMap and mounted into the Backstage pod.
+# Environment variables (${VAR}) are substituted at runtime.
+#
+# Required environment variables:
+#   - GITHUB_TOKEN: GitHub Personal Access Token for authentication
+#   - GITHUB_ORG: GitHub organization or user name
+#   - GITHUB_REPO: Repository containing catalog YAML files
+#   - GITHUB_BRANCH: Branch to read from (default: main)
+
+# GitHub Integration (required for private repositories)
+integrations:
+  github:
+    - host: github.com
+      token: ${GITHUB_TOKEN}
+
+# Catalog Configuration
+catalog:
+  # Import cycle frequency
+  processingInterval: { minutes: 5 }
+  
+  # Locations to import entities from
+  locations:
+    # Load all YAML files from the catalog directory in the configured repo
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH}/entities/**/*.yaml
+      rules:
+        - allow: [Component, Resource, System, Domain, API, Group, User, Location]
+
+  # Orphan cleanup strategy (removes entities when deleted from GitHub)
+  orphanStrategy: delete
+
+# Backend Configuration
+backend:
+  # SECURITY WARNING: This disables authentication for development/testing.
+  # Remove this in production and configure proper authentication.
+  # See DEPLOYMENT.md "TODO: Authentication Support" section.
+  auth:
+    dangerouslyDisableDefaultAuthPolicy: true
+
+  plugins:
+    catalog:
+      processors:
+        mcp:
+          enabled: true
+
+# MCP Catalog Plugin Configuration
+mcpCatalog:
+  enabled: true
+  processing:
+    batchSize: 100
+    validationInterval: 30
+  ui:
+    showRelationshipGraphs: true
+    maxEntitiesPerPage: 50
+  integrations:
+    openshift:
+      enabled: true
+      baseUrl: ${OPENSHIFT_API_URL}
+      namespace: mcp-tools-catalog

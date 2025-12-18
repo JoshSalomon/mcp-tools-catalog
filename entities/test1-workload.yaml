@@ -1,0 +1,109 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: data-sync-service
+  namespace: default
+  description: "A service that synchronizes data using MCP tools from the test1 server"
+  labels:
+    mcp-catalog.io/type: workload
+    mcp-catalog.io/category: data-management
+  annotations:
+    mcp-catalog.io/version: "1.0.0"
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: mcp-workload
+  lifecycle: experimental
+  owner: platform-team
+  system: data-platform
+  dependsOn:
+    - component:default/getinfo
+    - component:default/setinfo
+  consumes:
+    - component:default/getinfo
+    - component:default/setinfo
+  mcp:
+    purpose: "Automated data synchronization between external sources and internal systems"
+    tools:
+      - component:default/getinfo
+      - component:default/setinfo
+    deployment:
+      type: kubernetes
+      namespace: data-sync
+      replicas: 2
+    schedule: "*/15 * * * *"
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: audit-workflow
+  namespace: default
+  description: "Workflow that audits system state by querying MCP server information"
+  labels:
+    mcp-catalog.io/type: workload
+    mcp-catalog.io/category: compliance
+  annotations:
+    mcp-catalog.io/version: "1.0.0"
+spec:
+  type: mcp-workload
+  lifecycle: experimental
+  owner: security-team
+  system: compliance-platform
+  dependsOn:
+    - component:default/getinfo
+  consumes:
+    - component:default/getinfo
+  mcp:
+    purpose: "Periodic audit of system configuration and metadata for compliance reporting"
+    tools:
+      - component:default/getinfo
+    deployment:
+      type: cronjob
+      namespace: compliance
+      schedule: "0 2 * * *"
+    outputs:
+      - type: report
+        format: json
+        destination: s3://audit-reports/
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: config-manager
+  namespace: default
+  description: "Service that manages configuration updates across the platform"
+  labels:
+    mcp-catalog.io/type: workload
+    mcp-catalog.io/category: operations
+  annotations:
+    mcp-catalog.io/version: "2.0.0"
+spec:
+  type: mcp-workload
+  lifecycle: production
+  owner: ops-team
+  system: platform-operations
+  dependsOn:
+    - component:default/getinfo
+    - component:default/setinfo
+  consumes:
+    - component:default/getinfo
+    - component:default/setinfo
+  mcp:
+    purpose: "Centralized configuration management with audit trail"
+    tools:
+      - component:default/getinfo
+      - component:default/setinfo
+    deployment:
+      type: deployment
+      namespace: platform-ops
+      replicas: 3
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+    features:
+      - configuration-drift-detection
+      - automated-rollback
+      - change-notifications

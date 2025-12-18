@@ -4,3 +4,38 @@
 .devcontainer/dev.env
 integration-tests/videos
 integration-tests/screenshots
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env*
+!.env.example
+
+# Build outputs
+build/
+coverage/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+
+# Temporary files
+*.tmp
+__*
+
+# Certificates and keys
+certs/
+*.key
+*.crt
+*.pem
+!**/node_modules/**/*.crt
+!**/node_modules/**/*.pem

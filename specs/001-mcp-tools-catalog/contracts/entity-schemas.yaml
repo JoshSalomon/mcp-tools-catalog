@@ -1,0 +1,348 @@
+# Entity Schema Definitions for MCP Tools Catalog
+# OpenAPI 3.0 specification for MCP entity types
+
+openapi: 3.0.3
+info:
+  title: MCP Tools Catalog Entity Schemas
+  description: Backstage entity schema definitions for MCP infrastructure components
+  version: 1.0.0
+  contact:
+    name: MCP Tools Catalog Team
+
+components:
+  schemas:
+    # Common Backstage Entity Metadata
+    EntityMeta:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9]+(?:[-_][a-z0-9]+)*$'
+          description: Unique entity identifier
+        namespace:
+          type: string
+          default: default
+          description: Entity namespace
+        title:
+          type: string
+          description: Human-readable title
+        description:
+          type: string
+          description: Entity description
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+          description: Key-value labels for categorization
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+          description: Key-value annotations for metadata
+        tags:
+          type: array
+          items:
+            type: string
+          description: List of tags for searching/filtering
+
+    # Entity Relations
+    EntityRelation:
+      type: object
+      required:
+        - type
+        - targetRef
+      properties:
+        type:
+          type: string
+          enum:
+            - dependsOn
+            - ownedBy
+            - partOf
+            - memberOf
+            - provides
+            - consumes
+        targetRef:
+          type: string
+          pattern: '^[a-z]+:[a-z0-9-_]*\/[a-z0-9-_]*$'
+          description: Entity reference in format kind:namespace/name
+
+    # MCP Server Entity
+    MCPServerEntity:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+          enum:
+            - mcp-catalog.io/v1alpha1
+        kind:
+          type: string
+          enum:
+            - MCPServer
+        metadata:
+          $ref: '#/components/schemas/EntityMeta'
+        spec:
+          $ref: '#/components/schemas/MCPServerSpec'
+        relations:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityRelation'
+        status:
+          $ref: '#/components/schemas/MCPServerStatus'
+
+    MCPServerSpec:
+      type: object
+      required:
+        - type
+        - version
+      properties:
+        type:
+          type: string
+          enum:
+            - stdio
+            - sse
+            - websocket
+          description: Connection protocol type
+        endpoint:
+          type: string
+          description: Connection endpoint (URL for network types, command for stdio)
+        version:
+          type: string
+          pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+          description: Semantic version of the server
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum:
+              - tools
+              - resources
+              - prompts
+              - sampling
+          description: Server capabilities
+        command:
+          type: string
+          description: Command to start server (for stdio type)
+        args:
+          type: array
+          items:
+            type: string
+          description: Command line arguments
+        env:
+          type: object
+          additionalProperties:
+            type: string
+          description: Environment variables for server startup
+
+    MCPServerStatus:
+      type: object
+      properties:
+        lastUpdated:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        toolCount:
+          type: integer
+          minimum: 0
+          description: Number of tools provided by this server
+
+    # MCP Tool Entity
+    MCPToolEntity:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+          enum:
+            - mcp-catalog.io/v1alpha1
+        kind:
+          type: string
+          enum:
+            - MCPTool
+        metadata:
+          $ref: '#/components/schemas/EntityMeta'
+        spec:
+          $ref: '#/components/schemas/MCPToolSpec'
+        relations:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityRelation'
+
+    MCPToolSpec:
+      type: object
+      required:
+        - server
+        - type
+      properties:
+        server:
+          type: string
+          pattern: '^mcpserver:[a-z0-9-_]*\/[a-z0-9-_]*$'
+          description: Reference to parent MCP Server
+        type:
+          type: string
+          description: Tool category/type
+          examples:
+            - file-operation
+            - api-call
+            - data-analysis
+            - text-processing
+        inputSchema:
+          type: object
+          description: JSON Schema defining tool input parameters
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Specific capabilities this tool provides
+        parameters:
+          type: array
+          items:
+            type: string
+          description: Simplified parameter list for UI display
+
+    # MCP Workload Entity
+    MCPWorkloadEntity:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+          enum:
+            - mcp-catalog.io/v1alpha1
+        kind:
+          type: string
+          enum:
+            - MCPWorkload
+        metadata:
+          $ref: '#/components/schemas/EntityMeta'
+        spec:
+          $ref: '#/components/schemas/MCPWorkloadSpec'
+        relations:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityRelation'
+
+    MCPWorkloadSpec:
+      type: object
+      required:
+        - type
+        - purpose
+      properties:
+        type:
+          type: string
+          description: Workload classification
+          examples:
+            - workflow
+            - batch-job
+            - service
+            - application
+        purpose:
+          type: string
+          description: Business purpose description
+        tools:
+          type: array
+          items:
+            type: string
+            pattern: '^mcptool:[a-z0-9-_]*\/[a-z0-9-_]*\/[a-z0-9-_]*$'
+          description: Array of MCP Tool entity references
+        deploymentInfo:
+          type: object
+          properties:
+            schedule:
+              type: string
+              examples:
+                - on-demand
+                - daily
+                - weekly
+            runtime:
+              type: string
+              examples:
+                - nodejs
+                - python
+                - docker
+            environment:
+              type: string
+              examples:
+                - development
+                - staging
+                - production
+          description: Optional deployment metadata
+        dependencies:
+          type: array
+          items:
+            type: string
+          description: External system dependencies
+
+    # API Response Schemas
+    EntityListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/MCPServerEntity'
+              - $ref: '#/components/schemas/MCPToolEntity'
+              - $ref: '#/components/schemas/MCPWorkloadEntity'
+        totalItems:
+          type: integer
+          minimum: 0
+        cursor:
+          type: string
+          description: Pagination cursor for next page
+
+    EntityRelationshipResponse:
+      type: object
+      properties:
+        sourceEntity:
+          type: string
+          description: Source entity reference
+        relationships:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              target:
+                oneOf:
+                  - $ref: '#/components/schemas/MCPServerEntity'
+                  - $ref: '#/components/schemas/MCPToolEntity'
+                  - $ref: '#/components/schemas/MCPWorkloadEntity'
+
+    # Error Response
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          examples:
+            - ValidationError
+            - NotFoundError
+            - ConflictError
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error context
+        timestamp:
+          type: string
+          format: date-time

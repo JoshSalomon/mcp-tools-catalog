@@ -1,0 +1,13 @@
+{
+  "name": "backstage-console-proxy",
+  "version": "0.1.0",
+  "description": "Minimal HTTP proxy that injects Backstage static auth tokens for console requests.",
+  "main": "server.js",
+  "license": "Apache-2.0",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  }
+}

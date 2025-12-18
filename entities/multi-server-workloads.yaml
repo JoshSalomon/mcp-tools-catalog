@@ -1,0 +1,212 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cicd-pipeline-service
+  namespace: default
+  description: "Automated CI/CD pipeline that builds from GitHub and deploys to Kubernetes"
+  labels:
+    mcp-catalog.io/type: workload
+    mcp-catalog.io/category: automation
+  annotations:
+    mcp-catalog.io/version: "3.0.0"
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: mcp-workload
+  lifecycle: production
+  owner: devops-team
+  system: ci-cd-platform
+  dependsOn:
+    # GitHub tools for source code operations
+    - component:default/github-get-file
+    - component:default/github-create-pr
+    - component:default/github-list-issues
+    # Kubernetes tools for deployment
+    - component:default/k8s-apply-manifest
+    - component:default/k8s-scale-deployment
+    - component:default/k8s-list-pods
+    - component:default/k8s-get-pod-logs
+  consumes:
+    - component:default/github-get-file
+    - component:default/github-create-pr
+    - component:default/github-list-issues
+    - component:default/k8s-apply-manifest
+    - component:default/k8s-scale-deployment
+    - component:default/k8s-list-pods
+    - component:default/k8s-get-pod-logs
+  mcp:
+    purpose: "End-to-end CI/CD automation: fetches code from GitHub, builds containers, deploys to Kubernetes, and monitors deployment health"
+    tools:
+      - component:default/github-get-file
+      - component:default/github-create-pr
+      - component:default/github-list-issues
+      - component:default/k8s-apply-manifest
+      - component:default/k8s-scale-deployment
+      - component:default/k8s-list-pods
+      - component:default/k8s-get-pod-logs
+    deployment:
+      type: deployment
+      namespace: cicd
+      replicas: 3
+      resources:
+        requests:
+          memory: "512Mi"
+          cpu: "250m"
+        limits:
+          memory: "1Gi"
+          cpu: "1000m"
+    triggers:
+      - type: webhook
+        source: github
+        events:
+          - push
+          - pull_request
+      - type: schedule
+        cron: "0 */6 * * *"
+    features:
+      - automatic-rollback
+      - canary-deployments
+      - slack-notifications
+      - build-caching
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: infrastructure-monitor
+  namespace: default
+  description: "Monitors Kubernetes infrastructure and syncs status to internal systems"
+  labels:
+    mcp-catalog.io/type: workload
+    mcp-catalog.io/category: monitoring
+  annotations:
+    mcp-catalog.io/version: "2.1.0"
+spec:
+  type: mcp-workload
+  lifecycle: production
+  owner: ops-team
+  system: observability-platform
+  dependsOn:
+    # Kubernetes monitoring tools
+    - component:default/k8s-list-pods
+    - component:default/k8s-get-pod-logs
+    - component:default/k8s-describe-resource
+    - component:default/k8s-scale-deployment
+    # Internal system tools
+    - component:default/getinfo
+    - component:default/setinfo
+  consumes:
+    - component:default/k8s-list-pods
+    - component:default/k8s-get-pod-logs
+    - component:default/k8s-describe-resource
+    - component:default/k8s-scale-deployment
+    - component:default/getinfo
+    - component:default/setinfo
+  mcp:
+    purpose: "Continuous infrastructure monitoring with automatic remediation and status synchronization"
+    tools:
+      - component:default/k8s-list-pods
+      - component:default/k8s-get-pod-logs
+      - component:default/k8s-describe-resource
+      - component:default/k8s-scale-deployment
+      - component:default/getinfo
+      - component:default/setinfo
+    deployment:
+      type: daemonset
+      namespace: monitoring
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "256Mi"
+          cpu: "200m"
+    schedule: "*/5 * * * *"
+    alerts:
+      - type: pod-crash-loop
+        severity: critical
+        action: auto-restart
+      - type: high-memory
+        threshold: "90%"
+        severity: warning
+      - type: deployment-failed
+        severity: critical
+        action: notify-oncall
+    features:
+      - auto-scaling-recommendations
+      - anomaly-detection
+      - log-aggregation
+      - metric-collection
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: developer-portal-backend
+  namespace: default
+  description: "Backend service for developer portal - aggregates data from GitHub, Kubernetes, and internal APIs"
+  labels:
+    mcp-catalog.io/type: workload
+    mcp-catalog.io/category: platform
+  annotations:
+    mcp-catalog.io/version: "4.2.0"
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: mcp-workload
+  lifecycle: production
+  owner: platform-team
+  system: developer-platform
+  dependsOn:
+    # GitHub tools for repository data
+    - component:default/github-search-repos
+    - component:default/github-list-issues
+    - component:default/github-get-file
+    - component:default/github-create-issue
+    # Kubernetes tools for deployment info
+    - component:default/k8s-list-pods
+    - component:default/k8s-describe-resource
+    # Internal metadata tools
+    - component:default/getinfo
+    - component:default/setinfo
+  consumes:
+    - component:default/github-search-repos
+    - component:default/github-list-issues
+    - component:default/github-get-file
+    - component:default/github-create-issue
+    - component:default/k8s-list-pods
+    - component:default/k8s-describe-resource
+    - component:default/getinfo
+    - component:default/setinfo
+  mcp:
+    purpose: "Unified developer portal backend providing repository search, issue tracking, deployment status, and metadata management"
+    tools:
+      - component:default/github-search-repos
+      - component:default/github-list-issues
+      - component:default/github-get-file
+      - component:default/github-create-issue
+      - component:default/k8s-list-pods
+      - component:default/k8s-describe-resource
+      - component:default/getinfo
+      - component:default/setinfo
+    deployment:
+      type: deployment
+      namespace: developer-portal
+      replicas: 5
+      resources:
+        requests:
+          memory: "1Gi"
+          cpu: "500m"
+        limits:
+          memory: "2Gi"
+          cpu: "2000m"
+    api:
+      type: graphql
+      endpoint: /api/graphql
+      authentication: oauth2
+    caching:
+      type: redis
+      ttl: 300
+    features:
+      - repository-catalog
+      - issue-aggregation
+      - deployment-dashboard
+      - search-indexing
+      - activity-feed
+      - user-preferences

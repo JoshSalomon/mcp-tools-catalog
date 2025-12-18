@@ -3,7 +3,8 @@
 USE_SUDO="false"
 HELM_INSTALL_DIR="/tmp"
 
-curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+# Use -k flag if your cluster uses self-signed certificates
+curl -k -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
 chmod 700 get_helm.sh
 source get_helm.sh
 

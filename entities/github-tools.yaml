@@ -1,0 +1,291 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: github-create-issue
+  namespace: default
+  description: "Create a new issue in a GitHub repository"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: github-mcp
+    mcp-catalog.io/category: issues
+spec:
+  type: mcp-tool
+  lifecycle: production
+  owner: platform-team
+  subcomponentOf: component:default/github-mcp
+  mcp:
+    toolType: mutation
+    inputSchema:
+      type: object
+      properties:
+        owner:
+          type: string
+          description: "Repository owner (user or organization)"
+        repo:
+          type: string
+          description: "Repository name"
+        title:
+          type: string
+          description: "Issue title"
+        body:
+          type: string
+          description: "Issue body content (markdown supported)"
+        labels:
+          type: array
+          items:
+            type: string
+          description: "Labels to apply to the issue"
+        assignees:
+          type: array
+          items:
+            type: string
+          description: "Usernames to assign"
+      required:
+        - owner
+        - repo
+        - title
+    outputSchema:
+      type: object
+      properties:
+        number:
+          type: integer
+        url:
+          type: string
+        state:
+          type: string
+    capabilities:
+      - create
+      - issues
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: github-list-issues
+  namespace: default
+  description: "List issues from a GitHub repository with filtering options"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: github-mcp
+    mcp-catalog.io/category: issues
+spec:
+  type: mcp-tool
+  lifecycle: production
+  owner: platform-team
+  subcomponentOf: component:default/github-mcp
+  mcp:
+    toolType: query
+    inputSchema:
+      type: object
+      properties:
+        owner:
+          type: string
+          description: "Repository owner"
+        repo:
+          type: string
+          description: "Repository name"
+        state:
+          type: string
+          enum: ["open", "closed", "all"]
+          description: "Filter by issue state"
+        labels:
+          type: string
+          description: "Comma-separated list of labels to filter by"
+        per_page:
+          type: integer
+          default: 30
+          description: "Number of results per page"
+      required:
+        - owner
+        - repo
+    outputSchema:
+      type: array
+      items:
+        type: object
+        properties:
+          number:
+            type: integer
+          title:
+            type: string
+          state:
+            type: string
+          url:
+            type: string
+    capabilities:
+      - read
+      - list
+      - issues
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: github-create-pr
+  namespace: default
+  description: "Create a new pull request in a GitHub repository"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: github-mcp
+    mcp-catalog.io/category: pull-requests
+spec:
+  type: mcp-tool
+  lifecycle: production
+  owner: platform-team
+  subcomponentOf: component:default/github-mcp
+  mcp:
+    toolType: mutation
+    inputSchema:
+      type: object
+      properties:
+        owner:
+          type: string
+          description: "Repository owner"
+        repo:
+          type: string
+          description: "Repository name"
+        title:
+          type: string
+          description: "Pull request title"
+        body:
+          type: string
+          description: "Pull request description"
+        head:
+          type: string
+          description: "The branch containing changes"
+        base:
+          type: string
+          description: "The branch to merge into"
+        draft:
+          type: boolean
+          default: false
+          description: "Create as draft PR"
+      required:
+        - owner
+        - repo
+        - title
+        - head
+        - base
+    outputSchema:
+      type: object
+      properties:
+        number:
+          type: integer
+        url:
+          type: string
+        state:
+          type: string
+        mergeable:
+          type: boolean
+    capabilities:
+      - create
+      - pull-requests
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: github-get-file
+  namespace: default
+  description: "Get contents of a file from a GitHub repository"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: github-mcp
+    mcp-catalog.io/category: files
+spec:
+  type: mcp-tool
+  lifecycle: production
+  owner: platform-team
+  subcomponentOf: component:default/github-mcp
+  mcp:
+    toolType: query
+    inputSchema:
+      type: object
+      properties:
+        owner:
+          type: string
+          description: "Repository owner"
+        repo:
+          type: string
+          description: "Repository name"
+        path:
+          type: string
+          description: "Path to the file"
+        ref:
+          type: string
+          description: "Branch, tag, or commit SHA (defaults to default branch)"
+      required:
+        - owner
+        - repo
+        - path
+    outputSchema:
+      type: object
+      properties:
+        content:
+          type: string
+          description: "File content (base64 decoded)"
+        sha:
+          type: string
+        size:
+          type: integer
+        encoding:
+          type: string
+    capabilities:
+      - read
+      - files
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: github-search-repos
+  namespace: default
+  description: "Search for repositories on GitHub"
+  labels:
+    mcp-catalog.io/type: tool
+    mcp-catalog.io/server: github-mcp
+    mcp-catalog.io/category: search
+spec:
+  type: mcp-tool
+  lifecycle: production
+  owner: platform-team
+  subcomponentOf: component:default/github-mcp
+  mcp:
+    toolType: query
+    inputSchema:
+      type: object
+      properties:
+        query:
+          type: string
+          description: "Search query (GitHub search syntax)"
+        sort:
+          type: string
+          enum: ["stars", "forks", "updated", "help-wanted-issues"]
+          description: "Sort field"
+        order:
+          type: string
+          enum: ["asc", "desc"]
+          default: "desc"
+        per_page:
+          type: integer
+          default: 30
+          maximum: 100
+      required:
+        - query
+    outputSchema:
+      type: object
+      properties:
+        total_count:
+          type: integer
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              full_name:
+                type: string
+              description:
+                type: string
+              stargazers_count:
+                type: integer
+              url:
+                type: string
+    capabilities:
+      - read
+      - search
+      - repositories
