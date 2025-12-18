@@ -11,6 +11,9 @@ export const CATALOG_MCP_TOOL_KIND = 'Component';
 /** Backstage spec.type value for MCP tools */
 export const CATALOG_MCP_TOOL_TYPE = 'mcp-tool';
 
+/** Annotation key for disabled state */
+export const MCP_TOOL_DISABLED_ANNOTATION = 'mcp-catalog.io/disabled';
+
 /**
  * MCP Tool entity interface.
  * Represents an MCP tool provided by an MCP server in the Backstage Catalog.
@@ -59,3 +62,13 @@ export interface CatalogMcpTool extends Entity {
     [key: string]: any;
   };
 }
+
+/**
+ * Check if a tool entity is disabled.
+ * @param entity - The tool entity to check
+ * @returns true if the tool is disabled, false otherwise
+ */
+export const isToolDisabled = (entity: CatalogMcpTool): boolean => {
+  const annotations = entity.metadata.annotations as Record<string, string> | undefined;
+  return annotations?.[MCP_TOOL_DISABLED_ANNOTATION] === 'true';
+};

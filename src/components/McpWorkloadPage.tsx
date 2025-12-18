@@ -25,7 +25,7 @@ import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { usePerformanceMonitor } from '../utils/performanceMonitor';
 import { Breadcrumbs, createMcpCatalogBreadcrumbs } from './shared/Breadcrumbs';
 import { CatalogMcpWorkload, CATALOG_MCP_WORKLOAD_KIND } from '../models/CatalogMcpWorkload';
-import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE } from '../models/CatalogMcpTool';
+import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE, isToolDisabled } from '../models/CatalogMcpTool';
 import { CatalogMcpServer, CATALOG_MCP_SERVER_KIND, CATALOG_MCP_SERVER_TYPE } from '../models/CatalogMcpServer';
 import { useCatalogEntity, useCatalogEntities } from '../services/catalogService';
 import { getEntityName } from '../utils/hierarchicalNaming';
@@ -442,7 +442,11 @@ const McpWorkloadPage: React.FC = () => {
                             </Td>
                             <Td dataLabel="Status">
                               {toolRef.isValid ? (
-                                <Label color="green" isCompact>Valid</Label>
+                                toolRef.tool && isToolDisabled(toolRef.tool) ? (
+                                  <Label color="orange" isCompact>Disabled</Label>
+                                ) : (
+                                  <Label color="green" isCompact>Valid</Label>
+                                )
                               ) : (
                                 <Label color="red" isCompact>Not Found</Label>
                               )}

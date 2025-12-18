@@ -22,9 +22,10 @@ import { WrenchIcon, SearchIcon } from '@patternfly/react-icons';
 import { filterResources } from '../services/searchService';
 import { usePerformanceMonitor } from '../utils/performanceMonitor';
 import { Pagination } from './shared/Pagination';
-import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE } from '../models/CatalogMcpTool';
+import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE, isToolDisabled } from '../models/CatalogMcpTool';
 import { useCatalogEntities } from '../services/catalogService';
 import { getEntityName } from '../utils/hierarchicalNaming';
+import { DisabledBadge } from './shared/DisabledBadge';
 
 interface ToolsTabProps {
   /** Initial search term from parent component */
@@ -268,6 +269,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
               <Th>Server</Th>
               <Th>Lifecycle</Th>
               <Th>Owner</Th>
+              <Th>Status</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -310,6 +312,9 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
                   </Td>
                   <Td dataLabel="Lifecycle">{tool.spec.lifecycle}</Td>
                   <Td dataLabel="Owner">{tool.spec.owner}</Td>
+                  <Td dataLabel="Status">
+                    <DisabledBadge isDisabled={isToolDisabled(tool)} toolName={tool.metadata.name} />
+                  </Td>
                 </Tr>
               );
             })}

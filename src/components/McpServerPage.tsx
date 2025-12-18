@@ -22,8 +22,9 @@ import { usePerformanceMonitor } from '../utils/performanceMonitor';
 import { OfflineIndicator } from './shared/OfflineIndicator';
 import { Breadcrumbs, createMcpCatalogBreadcrumbs } from './shared/Breadcrumbs';
 import { CatalogMcpServer, CATALOG_MCP_SERVER_KIND } from '../models/CatalogMcpServer';
-import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE } from '../models/CatalogMcpTool';
+import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE, isToolDisabled } from '../models/CatalogMcpTool';
 import { useCatalogEntity, useCatalogEntities } from '../services/catalogService';
+import { DisabledCheckbox } from './shared/DisabledCheckbox';
 
 const McpServerPage: React.FC = () => {
   const params = useParams<{ name: string }>();
@@ -195,29 +196,37 @@ const McpServerPage: React.FC = () => {
                     <Th>Type</Th>
                     <Th>Lifecycle</Th>
                     <Th>Owner</Th>
+                    <Th>Status</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {serverTools.map((tool) => (
-                    <Tr key={tool.metadata.uid || tool.metadata.name}>
-                      <Td dataLabel="Name">
-                        <a
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            history.push(
-                              `/mcp-catalog/tools/${tool.metadata.name}?namespace=${tool.metadata.namespace || 'default'}`
-                            );
-                          }}
-                        >
-                          {tool.metadata.name}
-                        </a>
-                      </Td>
-                      <Td dataLabel="Type">{tool.spec.type}</Td>
-                      <Td dataLabel="Lifecycle">{tool.spec.lifecycle}</Td>
-                      <Td dataLabel="Owner">{tool.spec.owner}</Td>
-                    </Tr>
-                  ))}
+                  {serverTools.map((tool) => {
+                    const disabled = isToolDisabled(tool);
+                    const rowStyle = disabled ? { opacity: 0.6, backgroundColor: '#f5f5f5' } : undefined;
+                    return (
+                      <Tr key={tool.metadata.uid || tool.metadata.name} style={rowStyle}>
+                        <Td dataLabel="Name">
+                          <a
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              history.push(
+                                `/mcp-catalog/tools/${tool.metadata.name}?namespace=${tool.metadata.namespace || 'default'}`
+                              );
+                            }}
+                          >
+                            {tool.metadata.name}
+                          </a>
+                        </Td>
+                        <Td dataLabel="Type">{tool.spec.type}</Td>
+                        <Td dataLabel="Lifecycle">{tool.spec.lifecycle}</Td>
+                        <Td dataLabel="Owner">{tool.spec.owner}</Td>
+                        <Td dataLabel="Status">
+                          <DisabledCheckbox tool={tool} />
+                        </Td>
+                      </Tr>
+                    );
+                  })}
                 </Tbody>
               </Table>
             )}

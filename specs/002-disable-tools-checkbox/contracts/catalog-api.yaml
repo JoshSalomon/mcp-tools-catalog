@@ -1,0 +1,220 @@
+# Backstage Catalog API Contract for Disable Tools Feature
+# 
+# This document specifies how the MCP Catalog plugin interacts with
+# the Backstage Catalog API to persist tool disabled state.
+#
+# Base URL: /api/proxy/plugin/mcp-catalog/backstage/api/catalog
+
+openapi: 3.0.3
+info:
+  title: Backstage Catalog API - Tool Disabled State
+  version: 1.0.0
+  description: |
+    API contract for managing tool disabled state via Backstage Catalog annotations.
+    All requests go through the OpenShift Console proxy to the Backstage backend.
+
+servers:
+  - url: /api/proxy/plugin/mcp-catalog/backstage/api/catalog
+    description: OpenShift Console proxy to Backstage Catalog
+
+paths:
+  /entities/by-uid/{entityUid}:
+    patch:
+      summary: Update entity annotations
+      description: |
+        Update the disabled annotation on a tool entity using JSON Patch format.
+        Requires appropriate authorization (admin or platform-engineer role).
+      operationId: updateEntityAnnotation
+      parameters:
+        - name: entityUid
+          in: path
+          required: true
+          description: The unique identifier (UID) of the entity
+          schema:
+            type: string
+            format: uuid
+            example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      requestBody:
+        required: true
+        content:
+          application/json-patch+json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/JsonPatchOperation'
+            examples:
+              disableTool:
+                summary: Disable a tool
+                value:
+                  - op: add
+                    path: /metadata/annotations/mcp-catalog.io~1disabled
+                    value: "true"
+              enableTool:
+                summary: Enable a tool (remove annotation)
+                value:
+                  - op: remove
+                    path: /metadata/annotations/mcp-catalog.io~1disabled
+      responses:
+        '200':
+          description: Entity updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entity'
+        '400':
+          description: Invalid patch operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not authorized to modify entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Entity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict (entity was modified by another request)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /entities/by-name/{kind}/{namespace}/{name}:
+    get:
+      summary: Get entity by name
+      description: |
+        Retrieve a single entity by its kind, namespace, and name.
+        Used to fetch current entity state including disabled annotation.
+      operationId: getEntityByName
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "Component"
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "default"
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "github-create-issue"
+      responses:
+        '200':
+          description: Entity found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entity'
+        '404':
+          description: Entity not found
+
+components:
+  schemas:
+    JsonPatchOperation:
+      type: object
+      required:
+        - op
+        - path
+      properties:
+        op:
+          type: string
+          enum: [add, remove, replace]
+          description: The operation to perform
+        path:
+          type: string
+          description: |
+            JSON Pointer to the target location.
+            Note: Forward slashes in keys must be escaped as ~1
+          example: "/metadata/annotations/mcp-catalog.io~1disabled"
+        value:
+          type: string
+          description: The value to set (required for add/replace)
+          example: "true"
+
+    Entity:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+          example: "backstage.io/v1alpha1"
+        kind:
+          type: string
+          example: "Component"
+        metadata:
+          type: object
+          required:
+            - name
+            - uid
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+              default: "default"
+            uid:
+              type: string
+              format: uuid
+            annotations:
+              type: object
+              additionalProperties:
+                type: string
+              properties:
+                mcp-catalog.io/disabled:
+                  type: string
+                  enum: ["true"]
+                  description: Present with value "true" if tool is disabled
+        spec:
+          type: object
+          properties:
+            type:
+              type: string
+              example: "mcp-tool"
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            name:
+              type: string
+            message:
+              type: string
+            statusCode:
+              type: integer
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Authentication is handled by the OpenShift Console proxy.
+        The proxy forwards the user's OAuth token to Backstage.
+
+security:
+  - bearerAuth: []

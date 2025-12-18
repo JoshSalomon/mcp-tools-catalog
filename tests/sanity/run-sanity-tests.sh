@@ -423,19 +423,25 @@ test_relationships() {
     
     # REL-005: Bidirectional relations
     log_test "REL-005" "Bidirectional relations consistent"
-    if [[ -n "$tool_name" && "$tool_name" != "null" && -n "$server_name" && "$server_name" != "null" ]]; then
-        local tool_server=$(echo "$tool" | jq -r '.relations[] | select(.type == "partOf") | .targetRef' 2>/dev/null | head -1)
-        local server_tools=$(echo "$server" | jq -r '.relations[] | select(.type == "hasPart") | .targetRef' 2>/dev/null)
-        
-        if [[ -n "$tool_server" ]] && echo "$server_tools" | grep -q "$tool_name"; then
-            log_pass
-        elif [[ -z "$tool_server" ]]; then
-            log_fail "Tool has no partOf relation to verify"
+    if [[ -n "$tool_name" && "$tool_name" != "null" ]]; then
+        local tool_server_ref=$(echo "$tool" | jq -r '.relations[] | select(.type == "partOf") | .targetRef' 2>/dev/null | head -1)
+        if [[ -n "$tool_server_ref" ]]; then
+            # Extract server name from ref and fetch that specific server
+            local tool_server_name=$(echo "$tool_server_ref" | sed 's/.*\///')
+            local matching_server=$(curl -s "$BASE_URL/api/catalog/entities?filter=metadata.name=$tool_server_name" 2>/dev/null | jq '.[0]' 2>/dev/null)
+            local matching_server_tools=$(echo "$matching_server" | jq -r '.relations[] | select(.type == "hasPart") | .targetRef' 2>/dev/null)
+            
+            if echo "$matching_server_tools" | grep -q "$tool_name"; then
+                log_pass
+                log_info "Tool '$tool_name' ↔ Server '$tool_server_name' relations are consistent"
+            else
+                log_fail "Server '$tool_server_name' does not have hasPart relation back to tool '$tool_name'"
+            fi
         else
-            log_fail "Bidirectional relations not consistent"
+            log_fail "Tool '$tool_name' has no partOf relation to verify"
         fi
     else
-        log_skip "Not enough entities to test"
+        log_skip "No tools to test"
     fi
     
     # REL-006: Relation targets exist
