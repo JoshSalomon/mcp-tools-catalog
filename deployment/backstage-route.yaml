@@ -1,0 +1,21 @@
+# Backstage Route for external access
+# Uses edge TLS termination - OpenShift handles HTTPS, forwards HTTP to backstage
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: backstage
+  namespace: backstage
+  annotations:
+    haproxy.router.openshift.io/timeout: 120s
+spec:
+  host: backstage.apps.josh-ocp.192-168-122-253.sslip.io
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: backstage
+    weight: 100
+  wildcardPolicy: None

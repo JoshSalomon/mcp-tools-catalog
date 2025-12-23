@@ -1,0 +1,14 @@
+# PersistentVolumeClaim for SQLite database storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backstage-sqlite-pvc
+  namespace: backstage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # Use default storage class - adjust if needed
+  # storageClassName: gp2

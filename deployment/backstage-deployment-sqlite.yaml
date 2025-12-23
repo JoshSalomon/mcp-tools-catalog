@@ -1,0 +1,128 @@
+# Backstage deployment using SQLite with persistent storage (for PoC)
+# Backstage serves HTTP internally, nginx sidecar handles HTTPS for console plugin
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backstage
+  namespace: backstage
+spec:
+  # IMPORTANT: SQLite only supports single replica
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backstage
+  template:
+    metadata:
+      labels:
+        app: backstage
+    spec:
+      containers:
+        # Main Backstage container - serves HTTP on port 7007
+        - name: backstage
+          image: quay.io/jsalomon/backstage:v11
+          imagePullPolicy: Always
+          env:
+            - name: APP_BASE_URL
+              value: "https://backstage.apps.josh-ocp.192-168-122-253.sslip.io"
+            - name: APP_CONFIG_app_baseUrl
+              value: "https://backstage.apps.josh-ocp.192-168-122-253.sslip.io"
+            - name: APP_CONFIG_backend_baseUrl
+              value: "https://backstage.apps.josh-ocp.192-168-122-253.sslip.io"
+          envFrom:
+            - configMapRef:
+                name: backstage-github-config
+            - secretRef:
+                name: backstage-github-token
+          ports:
+            - containerPort: 7007
+              name: http
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: 7007
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: sqlite-data
+              mountPath: /app/sqlite-data
+            - name: app-config
+              mountPath: /app/app-config.production.yaml
+              subPath: app-config.production.yaml
+        # nginx sidecar - handles HTTPS on port 7443 for console plugin
+        - name: nginx-tls
+          image: registry.access.redhat.com/ubi9/nginx-122:latest
+          ports:
+            - containerPort: 7443
+              name: https
+              protocol: TCP
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              # Write nginx config
+              cat > /tmp/nginx.conf << 'NGINXCONF'
+              worker_processes auto;
+              error_log /dev/stderr;
+              pid /tmp/nginx.pid;
+              
+              events {
+                worker_connections 1024;
+              }
+              
+              http {
+                access_log /dev/stdout;
+                client_body_temp_path /tmp/client_body;
+                proxy_temp_path /tmp/proxy;
+                fastcgi_temp_path /tmp/fastcgi;
+                uwsgi_temp_path /tmp/uwsgi;
+                scgi_temp_path /tmp/scgi;
+                
+                server {
+                  listen 7443 ssl;
+                  ssl_certificate /etc/tls/tls.crt;
+                  ssl_certificate_key /etc/tls/tls.key;
+                  ssl_protocols TLSv1.2 TLSv1.3;
+                  
+                  location / {
+                    proxy_pass http://127.0.0.1:7007;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto https;
+                    proxy_read_timeout 120s;
+                    proxy_connect_timeout 30s;
+                  }
+                }
+              }
+              NGINXCONF
+              
+              # Run nginx with custom config
+              exec nginx -c /tmp/nginx.conf -g 'daemon off;'
+          volumeMounts:
+            - name: tls-certs
+              mountPath: /etc/tls
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+      volumes:
+        - name: sqlite-data
+          persistentVolumeClaim:
+            claimName: backstage-sqlite-pvc
+        - name: app-config
+          configMap:
+            name: backstage-app-config
+        - name: tls-certs
+          secret:
+            secretName: backstage-tls

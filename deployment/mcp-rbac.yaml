@@ -1,0 +1,299 @@
+# MCP Entity Management API - RBAC Definitions
+#
+# This file defines the ClusterRoles required for the MCP Entity Management API
+# RBAC enforcement. These roles are checked via SubjectAccessReview when users
+# attempt to create, update, or delete MCP entities.
+#
+# Apply with: oc apply -f deployment/mcp-rbac.yaml
+#
+# Role Requirements (per FR-005):
+#   - mcp-admin: Required for managing MCP Servers and Tools
+#   - mcp-user: Required for managing MCP Workloads
+#   - Read operations are public (no role required per FR-012)
+
+---
+# Custom Resource Definitions for MCP entities
+# These CRDs define the resources that RBAC checks against
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: mcpservers.mcp-catalog.io
+spec:
+  group: mcp-catalog.io
+  names:
+    kind: MCPServer
+    listKind: MCPServerList
+    plural: mcpservers
+    singular: mcpserver
+    shortNames:
+      - mcps
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: MCPServer represents an MCP server in the catalog
+          properties:
+            spec:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: mcptools.mcp-catalog.io
+spec:
+  group: mcp-catalog.io
+  names:
+    kind: MCPTool
+    listKind: MCPToolList
+    plural: mcptools
+    singular: mcptool
+    shortNames:
+      - mcpt
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: MCPTool represents an MCP tool in the catalog
+          properties:
+            spec:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: mcpworkloads.mcp-catalog.io
+spec:
+  group: mcp-catalog.io
+  names:
+    kind: MCPWorkload
+    listKind: MCPWorkloadList
+    plural: mcpworkloads
+    singular: mcpworkload
+    shortNames:
+      - mcpw
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: MCPWorkload represents an MCP workload in the catalog
+          properties:
+            spec:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+
+---
+# =============================================================================
+# Service Account Permissions for Backstage
+# =============================================================================
+# The Backstage service account needs permission to create SubjectAccessReview
+# resources to check user permissions via the Kubernetes API.
+
+# ClusterRole: mcp-auth-delegator
+# Allows the Backstage service account to perform SubjectAccessReview checks
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mcp-auth-delegator
+  labels:
+    app.kubernetes.io/part-of: mcp-tools-catalog
+    app.kubernetes.io/component: rbac
+rules:
+  # Permission to create SubjectAccessReview to check user permissions
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["subjectaccessreviews"]
+    verbs: ["create"]
+  # Permission to get TokenReview for token validation (optional)
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+
+---
+# ClusterRoleBinding: backstage-auth-delegator
+# Grants the Backstage service account permission to check user permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backstage-auth-delegator
+  labels:
+    app.kubernetes.io/part-of: mcp-tools-catalog
+    app.kubernetes.io/component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mcp-auth-delegator
+subjects:
+  # The Backstage service account
+  - kind: ServiceAccount
+    name: backstage
+    namespace: backstage
+  # Also allow default service account if Backstage uses it
+  - kind: ServiceAccount
+    name: default
+    namespace: backstage
+
+---
+# ClusterRole: mcp-admin
+# Grants permission to manage MCP Servers and Tools
+# Required by: FR-005
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mcp-admin
+  labels:
+    app.kubernetes.io/part-of: mcp-tools-catalog
+    app.kubernetes.io/component: rbac
+rules:
+  # Full access to MCP Servers
+  - apiGroups: ["mcp-catalog.io"]
+    resources: ["mcpservers"]
+    verbs: ["create", "update", "patch", "delete", "get", "list", "watch"]
+  # Full access to MCP Tools
+  - apiGroups: ["mcp-catalog.io"]
+    resources: ["mcptools"]
+    verbs: ["create", "update", "patch", "delete", "get", "list", "watch"]
+  # Read-only access to MCP Workloads (for visibility)
+  - apiGroups: ["mcp-catalog.io"]
+    resources: ["mcpworkloads"]
+    verbs: ["get", "list", "watch"]
+
+---
+# ClusterRole: mcp-user
+# Grants permission to manage MCP Workloads only
+# Required by: FR-005
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mcp-user
+  labels:
+    app.kubernetes.io/part-of: mcp-tools-catalog
+    app.kubernetes.io/component: rbac
+rules:
+  # Full access to MCP Workloads
+  - apiGroups: ["mcp-catalog.io"]
+    resources: ["mcpworkloads"]
+    verbs: ["create", "update", "patch", "delete", "get", "list", "watch"]
+  # Read-only access to Servers and Tools (for dependency resolution)
+  - apiGroups: ["mcp-catalog.io"]
+    resources: ["mcpservers", "mcptools"]
+    verbs: ["get", "list", "watch"]
+
+---
+# ClusterRole: mcp-viewer
+# Read-only access to all MCP resources
+# Optional: For users who only need to view catalog entries
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mcp-viewer
+  labels:
+    app.kubernetes.io/part-of: mcp-tools-catalog
+    app.kubernetes.io/component: rbac
+rules:
+  - apiGroups: ["mcp-catalog.io"]
+    resources: ["mcpservers", "mcptools", "mcpworkloads"]
+    verbs: ["get", "list", "watch"]
+
+---
+# =============================================================================
+# ClusterRoleBindings - CUSTOMIZE THESE FOR YOUR ENVIRONMENT
+# =============================================================================
+#
+# The bindings below use placeholder values. Update them before applying:
+#   - Change group names to match your identity provider groups
+#   - Or change to specific users
+#   - Or use system:authenticated for all logged-in users
+#
+# Apply selectively:
+#   oc apply -f deployment/mcp-rbac.yaml  # All resources
+#   oc apply -f deployment/mcp-rbac.yaml -l app.kubernetes.io/component=rbac  # Only roles
+# =============================================================================
+
+---
+# ClusterRoleBinding: mcp-admins
+# Grants mcp-admin role to members of the 'mcp-admins' group
+# 
+# CUSTOMIZE: Change 'mcp-admins' to your admin group name, or change to User kind
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mcp-admins
+  labels:
+    app.kubernetes.io/part-of: mcp-tools-catalog
+    app.kubernetes.io/component: rbac-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mcp-admin
+subjects:
+  # Option 1: Bind to a group (recommended for production)
+  - kind: Group
+    name: mcp-admins  # CUSTOMIZE: Your admin group from identity provider
+    apiGroup: rbac.authorization.k8s.io
+  # Option 2: Bind to specific users (uncomment and add users)
+  # - kind: User
+  #   name: admin@example.com
+  #   apiGroup: rbac.authorization.k8s.io
+
+---
+# ClusterRoleBinding: mcp-users
+# Grants mcp-user role to all authenticated users
+#
+# CUSTOMIZE: Change to a specific group if you don't want all users to have this role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mcp-users
+  labels:
+    app.kubernetes.io/part-of: mcp-tools-catalog
+    app.kubernetes.io/component: rbac-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mcp-user
+subjects:
+  # Option 1: All authenticated users (permissive - good for dev/test)
+  - kind: Group
+    name: system:authenticated
+    apiGroup: rbac.authorization.k8s.io
+  # Option 2: Specific group (recommended for production)
+  # - kind: Group
+  #   name: mcp-users  # CUSTOMIZE: Your user group from identity provider
+  #   apiGroup: rbac.authorization.k8s.io
+
+---
+# ClusterRoleBinding: mcp-viewers
+# Grants read-only access to all authenticated users
+#
+# This is optional - GET/LIST operations are already public via the API (FR-012)
+# Use this if you want to grant Kubernetes-level read access to the CRDs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mcp-viewers
+  labels:
+    app.kubernetes.io/part-of: mcp-tools-catalog
+    app.kubernetes.io/component: rbac-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mcp-viewer
+subjects:
+  - kind: Group
+    name: system:authenticated
+    apiGroup: rbac.authorization.k8s.io

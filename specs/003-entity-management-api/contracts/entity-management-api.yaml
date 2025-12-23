@@ -1,0 +1,755 @@
+openapi: 3.0.3
+info:
+  title: MCP Entity Management API
+  description: |
+    REST API for managing MCP entities (Servers, Tools, Workloads) in the Backstage catalog.
+    Enforces OCP role-based access control per entity type.
+  version: 1.0.0
+  contact:
+    name: MCP Tools Catalog Team
+
+servers:
+  - url: /api/mcp-entities/v1
+    description: Backstage backend plugin endpoint
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: servers
+    description: MCP Server management (requires mcp-admin role)
+  - name: tools
+    description: MCP Tool management (requires mcp-admin role)
+  - name: workloads
+    description: MCP Workload management (requires mcp-user role)
+
+paths:
+  /servers:
+    get:
+      tags: [servers]
+      summary: List all MCP Servers
+      description: Returns all MCP Server entities. Any authenticated user can read.
+      operationId: listServers
+      parameters:
+        - $ref: '#/components/parameters/namespaceFilter'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+      responses:
+        '200':
+          description: List of servers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags: [servers]
+      summary: Create an MCP Server
+      description: Creates a new MCP Server entity. Requires mcp-admin role.
+      operationId: createServer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MCPServerInput'
+      responses:
+        '201':
+          description: Server created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPServerEntity'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /servers/{namespace}/{name}:
+    parameters:
+      - $ref: '#/components/parameters/namespace'
+      - $ref: '#/components/parameters/name'
+
+    get:
+      tags: [servers]
+      summary: Get an MCP Server by name
+      description: Returns a single MCP Server entity. Any authenticated user can read.
+      operationId: getServer
+      responses:
+        '200':
+          description: Server details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPServerEntity'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      tags: [servers]
+      summary: Update an MCP Server
+      description: Updates an existing MCP Server entity. Requires mcp-admin role.
+      operationId: updateServer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MCPServerInput'
+      responses:
+        '200':
+          description: Server updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPServerEntity'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags: [servers]
+      summary: Delete an MCP Server
+      description: |
+        Deletes an MCP Server and all associated MCP Tools (cascade delete).
+        Requires mcp-admin role.
+      operationId: deleteServer
+      responses:
+        '204':
+          description: Server deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tools:
+    get:
+      tags: [tools]
+      summary: List all MCP Tools
+      description: Returns all MCP Tool entities. Any authenticated user can read.
+      operationId: listTools
+      parameters:
+        - $ref: '#/components/parameters/namespaceFilter'
+        - $ref: '#/components/parameters/serverFilter'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+      responses:
+        '200':
+          description: List of tools
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags: [tools]
+      summary: Create an MCP Tool
+      description: Creates a new MCP Tool entity. Requires mcp-admin role.
+      operationId: createTool
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MCPToolInput'
+      responses:
+        '201':
+          description: Tool created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPToolEntity'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tools/{namespace}/{name}:
+    parameters:
+      - $ref: '#/components/parameters/namespace'
+      - $ref: '#/components/parameters/name'
+
+    get:
+      tags: [tools]
+      summary: Get an MCP Tool by name
+      operationId: getTool
+      responses:
+        '200':
+          description: Tool details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPToolEntity'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      tags: [tools]
+      summary: Update an MCP Tool
+      description: Requires mcp-admin role.
+      operationId: updateTool
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MCPToolInput'
+      responses:
+        '200':
+          description: Tool updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPToolEntity'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags: [tools]
+      summary: Delete an MCP Tool
+      description: |
+        Deletes an MCP Tool. Workloads depending on this tool will have dangling references (orphan behavior).
+        Requires mcp-admin role.
+      operationId: deleteTool
+      responses:
+        '204':
+          description: Tool deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /workloads:
+    get:
+      tags: [workloads]
+      summary: List all MCP Workloads
+      operationId: listWorkloads
+      parameters:
+        - $ref: '#/components/parameters/namespaceFilter'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+      responses:
+        '200':
+          description: List of workloads
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags: [workloads]
+      summary: Create an MCP Workload
+      description: Creates a new MCP Workload entity. Requires mcp-user role.
+      operationId: createWorkload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MCPWorkloadInput'
+      responses:
+        '201':
+          description: Workload created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPWorkloadEntity'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /workloads/{namespace}/{name}:
+    parameters:
+      - $ref: '#/components/parameters/namespace'
+      - $ref: '#/components/parameters/name'
+
+    get:
+      tags: [workloads]
+      summary: Get an MCP Workload by name
+      operationId: getWorkload
+      responses:
+        '200':
+          description: Workload details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPWorkloadEntity'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      tags: [workloads]
+      summary: Update an MCP Workload
+      description: Requires mcp-user role.
+      operationId: updateWorkload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MCPWorkloadInput'
+      responses:
+        '200':
+          description: Workload updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPWorkloadEntity'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags: [workloads]
+      summary: Delete an MCP Workload
+      description: Requires mcp-user role.
+      operationId: deleteWorkload
+      responses:
+        '204':
+          description: Workload deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: OCP bearer token from authenticated session
+
+  parameters:
+    namespace:
+      name: namespace
+      in: path
+      required: true
+      schema:
+        type: string
+        default: default
+      description: Entity namespace
+
+    name:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-z0-9]+(?:[-][a-z0-9]+)*$'
+      description: Entity name
+
+    namespaceFilter:
+      name: namespace
+      in: query
+      schema:
+        type: string
+      description: Filter by namespace
+
+    serverFilter:
+      name: server
+      in: query
+      schema:
+        type: string
+      description: Filter tools by parent server (e.g., component:default/my-server)
+
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Maximum number of results
+
+    cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+      description: Pagination cursor
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: UnauthorizedError
+            message: Authentication token required
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: ForbiddenError
+            message: User lacks required role 'mcp-admin' for this operation
+
+    NotFound:
+      description: Entity not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: NotFoundError
+            message: Entity 'component:default/my-server' not found
+
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: ValidationError
+            message: Entity failed schema validation
+            details:
+              path: /spec/mcp/version
+              expected: string matching semver pattern
+              received: "1.0"
+
+    Conflict:
+      description: Entity already exists
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: ConflictError
+            message: Entity 'component:default/my-server' already exists
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: InternalError
+            message: An unexpected error occurred
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type identifier
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error context
+
+    EntityListResponse:
+      type: object
+      required:
+        - items
+        - totalCount
+      properties:
+        items:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/MCPServerEntity'
+              - $ref: '#/components/schemas/MCPToolEntity'
+              - $ref: '#/components/schemas/MCPWorkloadEntity'
+        totalCount:
+          type: integer
+          minimum: 0
+        cursor:
+          type: string
+          description: Cursor for next page (null if no more results)
+
+    MCPServerInput:
+      type: object
+      required:
+        - metadata
+        - spec
+      properties:
+        metadata:
+          $ref: '#/components/schemas/EntityMetadataInput'
+        spec:
+          $ref: '#/components/schemas/MCPServerSpecInput'
+
+    MCPServerSpecInput:
+      type: object
+      required:
+        - lifecycle
+        - owner
+        - mcp
+      properties:
+        lifecycle:
+          type: string
+          enum: [production, experimental, deprecated]
+        owner:
+          type: string
+          description: Owner entity reference
+        mcp:
+          type: object
+          required:
+            - connectionType
+            - version
+          properties:
+            connectionType:
+              type: string
+              enum: [stdio, sse, websocket]
+            endpoint:
+              type: string
+            command:
+              type: string
+            version:
+              type: string
+              pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+            capabilities:
+              type: array
+              items:
+                type: string
+                enum: [tools, resources, prompts, sampling]
+
+    MCPServerEntity:
+      allOf:
+        - $ref: '#/components/schemas/MCPServerInput'
+        - type: object
+          properties:
+            apiVersion:
+              type: string
+              enum: [backstage.io/v1alpha1]
+            kind:
+              type: string
+              enum: [Component]
+            relations:
+              type: array
+              items:
+                $ref: '#/components/schemas/EntityRelation'
+
+    MCPToolInput:
+      type: object
+      required:
+        - metadata
+        - spec
+      properties:
+        metadata:
+          $ref: '#/components/schemas/EntityMetadataInput'
+        spec:
+          $ref: '#/components/schemas/MCPToolSpecInput'
+
+    MCPToolSpecInput:
+      type: object
+      required:
+        - lifecycle
+        - owner
+        - subcomponentOf
+      properties:
+        lifecycle:
+          type: string
+          enum: [production, experimental, deprecated]
+        owner:
+          type: string
+        subcomponentOf:
+          type: string
+          description: Parent server reference (e.g., component:default/my-server)
+        mcp:
+          type: object
+          properties:
+            inputSchema:
+              type: object
+            category:
+              type: string
+            parameters:
+              type: array
+              items:
+                type: string
+
+    MCPToolEntity:
+      allOf:
+        - $ref: '#/components/schemas/MCPToolInput'
+        - type: object
+          properties:
+            apiVersion:
+              type: string
+              enum: [backstage.io/v1alpha1]
+            kind:
+              type: string
+              enum: [Component]
+            relations:
+              type: array
+              items:
+                $ref: '#/components/schemas/EntityRelation'
+
+    MCPWorkloadInput:
+      type: object
+      required:
+        - metadata
+        - spec
+      properties:
+        metadata:
+          $ref: '#/components/schemas/EntityMetadataInput'
+        spec:
+          $ref: '#/components/schemas/MCPWorkloadSpecInput'
+
+    MCPWorkloadSpecInput:
+      type: object
+      required:
+        - lifecycle
+        - owner
+      properties:
+        lifecycle:
+          type: string
+          enum: [production, experimental, deprecated]
+        owner:
+          type: string
+        dependsOn:
+          type: array
+          items:
+            type: string
+          description: Tool references this workload depends on
+        mcp:
+          type: object
+          properties:
+            purpose:
+              type: string
+            schedule:
+              type: string
+              enum: [on-demand, daily, weekly]
+            runtime:
+              type: string
+
+    MCPWorkloadEntity:
+      allOf:
+        - $ref: '#/components/schemas/MCPWorkloadInput'
+        - type: object
+          properties:
+            apiVersion:
+              type: string
+              enum: [backstage.io/v1alpha1]
+            kind:
+              type: string
+              enum: [Component]
+            relations:
+              type: array
+              items:
+                $ref: '#/components/schemas/EntityRelation'
+
+    EntityMetadataInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9]+(?:[-][a-z0-9]+)*$'
+        namespace:
+          type: string
+          default: default
+        title:
+          type: string
+        description:
+          type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    EntityRelation:
+      type: object
+      properties:
+        type:
+          type: string
+        targetRef:
+          type: string
