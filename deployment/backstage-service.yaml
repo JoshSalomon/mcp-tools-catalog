@@ -1,0 +1,26 @@
+# Backstage Service
+# Exposes both HTTP (7007) for external route and HTTPS (7443) for console plugin
+apiVersion: v1
+kind: Service
+metadata:
+  name: backstage
+  namespace: backstage
+  annotations:
+    # This annotation triggers OpenShift to generate TLS certificates
+    # The secret 'backstage-tls' will be auto-created with tls.crt and tls.key
+    service.beta.openshift.io/serving-cert-secret-name: backstage-tls
+spec:
+  type: ClusterIP
+  selector:
+    app: backstage
+  ports:
+    # HTTP port - used by external route (edge TLS termination)
+    - name: http
+      port: 7007
+      protocol: TCP
+      targetPort: 7007
+    # HTTPS port - used by console plugin proxy (nginx sidecar)
+    - name: https
+      port: 7443
+      protocol: TCP
+      targetPort: 7443

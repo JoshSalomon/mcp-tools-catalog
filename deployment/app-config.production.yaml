@@ -39,6 +39,13 @@ backend:
   auth:
     dangerouslyDisableDefaultAuthPolicy: true
 
+  # Database configuration for SQLite (PoC)
+  # For production, switch to PostgreSQL - see backstage-deployment.yaml
+  database:
+    client: better-sqlite3
+    connection:
+      directory: /app/sqlite-data
+
   plugins:
     catalog:
       processors:

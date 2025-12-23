@@ -29,7 +29,8 @@ backend:
   # The production database configuration is stored in app-config.production.yaml
   database:
     client: better-sqlite3
-    connection: ':memory:'
+    connection:
+      directory: ./sqlite-data
   # workingDirectory: /tmp # Use this to configure a working directory for the scaffolder, defaults to the OS temp-dir
 
 integrations:
@@ -111,3 +112,14 @@ kubernetes:
 permission:
   # setting this to `false` will disable permissions
   enabled: true
+
+# MCP Entity Management API configuration
+# Configures OCP role requirements per entity type (FR-004, FR-005)
+mcpEntityApi:
+  roles:
+    # Role required to manage MCP Servers (create, update, delete)
+    server: mcp-admin
+    # Role required to manage MCP Tools (create, update, delete)
+    tool: mcp-admin
+    # Role required to manage MCP Workloads (create, update, delete)
+    workload: mcp-user

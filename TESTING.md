@@ -279,6 +279,174 @@ describe('McpCatalogClient Integration', () => {
 });
 ```
 
+## 🔐 RBAC Integration Testing
+
+The project includes an automated RBAC test script that validates role-based access control enforcement for the MCP Entity Management API.
+
+### Running RBAC Tests
+
+```bash
+# Run RBAC tests (admin user)
+./tests/sanity/test-rbac.sh
+
+# Run with verbose output
+./tests/sanity/test-rbac.sh --verbose
+
+# For non-admin users, set BACKSTAGE_URL environment variable
+export BACKSTAGE_URL=https://backstage.apps.your-cluster.example.com
+./tests/sanity/test-rbac.sh
+
+# Or pass it inline
+BACKSTAGE_URL=https://backstage.apps.your-cluster.example.com ./tests/sanity/test-rbac.sh --verbose
+```
+
+### What the Test Script Validates
+
+1. **Permission Detection**: Uses `oc auth can-i` to verify user permissions
+2. **Role Detection**: Automatically detects `mcp-admin` and `mcp-user` roles
+3. **Public Read Access**: Verifies GET endpoints work without authentication
+4. **Unauthenticated Write Protection**: Verifies POST endpoints reject requests without tokens (401)
+5. **Role-Based Authorization**: Tests creating entities with proper roles:
+   - Servers/Tools require `mcp-admin` role
+   - Workloads require `mcp-user` role
+6. **Cascade Delete Behavior**: Tests deletion cascading from servers to tools
+7. **Cleanup**: Automatically removes test entities after testing
+
+### Test Scenarios
+
+**Admin User (`mcp-admin` role):**
+- ✅ Can create servers and tools (201 Created)
+- ✅ Can delete servers and tools (204 No Content)
+- ✅ Can read workloads (200 OK)
+- ❌ Cannot create workloads without `mcp-user` role (403 Forbidden)
+
+**Regular User (`mcp-user` role):**
+- ✅ Can create workloads (201 Created)
+- ✅ Can read servers and tools (200 OK)
+- ❌ Cannot create servers or tools (403 Forbidden)
+
+**Unauthenticated User:**
+- ✅ Can read all entities (200 OK)
+- ❌ Cannot create any entities (401 Unauthorized)
+
+### Test Output
+
+The script provides color-coded output:
+- ✅ **Green [PASS]**: Test passed
+- ❌ **Red [FAIL]**: Test failed
+- ⚠️ **Yellow [WARN]**: Warning message
+- ℹ️ **Blue [INFO]**: Informational message
+- 🔵 **Cyan [SKIP]**: Test skipped
+
+### Options
+
+- `--skip-cleanup`: Don't delete test entities after tests (useful for debugging)
+- `--verbose` or `-v`: Show detailed output including response bodies
+- `--help` or `-h`: Show usage information
+
+### Troubleshooting RBAC Tests
+
+**503 Service Unavailable Errors:**
+- Verify RBAC resources are deployed: `oc get clusterrole mcp-auth-delegator`
+- Check Backstage service account permissions: `oc get clusterrolebinding backstage-auth-delegator`
+- Ensure Backstage pod has been restarted after RBAC deployment
+- Verify Backstage container includes latest RBAC code
+
+**Route Not Found (Non-Admin Users):**
+- Set `BACKSTAGE_URL` environment variable before running tests
+- Example: `export BACKSTAGE_URL=https://backstage.apps.your-cluster.example.com`
+
+**403 Forbidden Errors:**
+- Verify user has required ClusterRoleBinding
+- Check role assignments: `oc get clusterrolebinding | grep mcp`
+- Verify user identity: `oc whoami`
+
+For more details, see the [RBAC Deployment Guide](../DEPLOYMENT.md#-part-e-configure-mcp-rbac-entity-management-api).
+
+## ⚡ Performance, Security, and Visibility Testing
+
+The project includes automated tests for non-functional requirements (performance, security, and catalog visibility).
+
+### Running Performance, Security, and Visibility Tests
+
+```bash
+# Run all non-functional requirement tests
+./tests/sanity/test-performance-security-visibility.sh
+
+# Run with verbose output
+./tests/sanity/test-performance-security-visibility.sh --verbose
+
+# For non-admin users, set BACKSTAGE_URL
+export BACKSTAGE_URL=https://backstage.apps.your-cluster.example.com
+./tests/sanity/test-performance-security-visibility.sh
+```
+
+### Performance Testing (SC-001)
+
+**Target**: p95 response time < 500ms
+
+The performance test:
+- Sends 50 sequential GET requests to the `/servers` endpoint
+- Measures response time for each request
+- Calculates p50 (median), p95, and p99 percentiles
+- Verifies p95 is below 500ms threshold
+
+**Example Output:**
+```
+Performance Results:
+  p50 (median): 469ms
+  p95: 472ms
+  p99: 484ms
+[PASS] p95 response time: 472ms (target: <500ms)
+```
+
+### Security Testing (SC-002)
+
+**Target**: 100% unauthorized requests blocked
+
+The security test verifies:
+- POST requests without authentication token return 401 Unauthorized
+- POST requests with invalid token return 403 Forbidden
+- All write operations (servers, tools, workloads) are protected
+- No unauthorized requests succeed
+
+**Example Output:**
+```
+Security Test Results:
+  Unauthorized requests blocked: 4 / 4
+  Unauthorized requests allowed: 0 / 4
+  Block rate: 100%
+[PASS] 100% of unauthorized requests blocked (target: 100%)
+```
+
+### Catalog Visibility Testing (SC-003)
+
+**Target**: Entities visible in catalog within 5 seconds
+
+The visibility test:
+- Creates a test entity via API
+- Polls the catalog list endpoint every second
+- Verifies entity appears in the list within 5 seconds
+- Cleans up the test entity automatically
+
+**Note**: Requires `mcp-admin` role to create test entities.
+
+**Example Output:**
+```
+[PASS] Test entity created
+[PASS] Entity visible in catalog within 1 seconds (target: <5s)
+```
+
+### Test Scripts
+
+| Script | Purpose | Requirements |
+|--------|---------|--------------|
+| `test-performance-security-visibility.sh` | Validates SC-001, SC-002, SC-003 | Any authenticated user (admin for visibility test) |
+| `test-quickstart-validation.sh` | Validates quickstart scenarios | mcp-admin role |
+| `test-rbac.sh` | Validates RBAC enforcement | Any authenticated user |
+
+For more details, see the [Sanity Tests README](./tests/sanity/README.md).
+
 ## 🌐 End-to-End Testing
 
 ### Cypress Setup

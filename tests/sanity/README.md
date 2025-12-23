@@ -46,6 +46,98 @@ Comprehensive test suite covering:
 | Console Integration | CON-001 to CON-003 | Plugin registration |
 | Data Integrity | DAT-001 to DAT-005 | Schema and orphan checks |
 
+### `test-rbac.sh`
+
+Automated RBAC (Role-Based Access Control) integration test for the MCP Entity Management API.
+
+**Usage:**
+```bash
+# Run RBAC tests (admin user)
+./test-rbac.sh
+
+# Run with verbose output
+./test-rbac.sh --verbose
+
+# For non-admin users, set BACKSTAGE_URL
+export BACKSTAGE_URL=https://backstage.apps.your-cluster.example.com
+./test-rbac.sh
+```
+
+**What it tests:**
+- Permission detection via `oc auth can-i`
+- Role-based authorization (mcp-admin, mcp-user)
+- Public read access (no auth required)
+- Unauthenticated write protection (401 errors)
+- Cascade delete behavior (server deletion removes tools)
+- Automatic cleanup of test entities
+
+**Options:**
+- `--skip-cleanup`: Don't delete test entities after tests
+- `--verbose` or `-v`: Show detailed output
+- `--help` or `-h`: Show usage information
+
+For detailed information, see [RBAC Testing](../TESTING.md#-rbac-integration-testing) and [RBAC Deployment](../../DEPLOYMENT.md#-part-e-configure-mcp-rbac-entity-management-api).
+
+### `test-quickstart-validation.sh`
+
+Validates all scenarios from the Entity Management API quickstart guide.
+
+**Usage:**
+```bash
+# Run quickstart validation (requires mcp-admin role)
+./test-quickstart-validation.sh
+
+# Run with verbose output
+./test-quickstart-validation.sh --verbose
+
+# For non-admin users, set BACKSTAGE_URL
+export BACKSTAGE_URL=https://backstage.apps.your-cluster.example.com
+./test-quickstart-validation.sh
+```
+
+**What it tests:**
+- Create Server, Tool, and Workload entities
+- List all entity types
+- Get specific entity by name
+- Update entity properties
+- Delete entities (including cascade delete behavior)
+- Validates response structures match expected format
+
+**Options:**
+- `--skip-cleanup`: Don't delete test entities after tests
+- `--verbose` or `-v`: Show detailed output including response bodies
+- `--help` or `-h`: Show usage information
+
+**Note:** This script requires `mcp-admin` role and will exit early with clear instructions if the role is missing.
+
+### `test-performance-security-visibility.sh`
+
+Validates non-functional requirements: performance, security, and catalog visibility.
+
+**Usage:**
+```bash
+# Run performance, security, and visibility tests
+./test-performance-security-visibility.sh
+
+# Run with verbose output
+./test-performance-security-visibility.sh --verbose
+
+# For non-admin users, set BACKSTAGE_URL
+export BACKSTAGE_URL=https://backstage.apps.your-cluster.example.com
+./test-performance-security-visibility.sh
+```
+
+**What it tests:**
+- **Performance (SC-001)**: Measures p50, p95, p99 response times for 50 requests, verifies p95 < 500ms
+- **Security (SC-002)**: Tests unauthorized requests (no token, invalid token) and verifies 100% are blocked
+- **Visibility (SC-003)**: Creates entity and verifies it appears in catalog list within 5 seconds
+
+**Options:**
+- `--verbose` or `-v`: Show detailed output including individual request timings
+- `--help` or `-h`: Show usage information
+
+**Note:** The visibility test requires `mcp-admin` role to create test entities. Performance and security tests work with any authenticated user.
+
 ## Configuration
 
 Environment variables:
