@@ -57,7 +57,8 @@ yarn build
 yarn test
 
 # Build, push, deploy, and test (one command)
-./build-push-deploy-test.sh
+./build-push-deploy-test.sh                    # Console plugin (default)
+./build-push-deploy-test.sh --backstage-only  # Backstage only
 
 # Build container only
 ./build-container.sh --local
@@ -105,14 +106,20 @@ All MCP entities are standard Backstage `Component` kind:
 - ✅ Phase 3: Explore MCP Tools (User Story 2)
 - ✅ Phase 4: Manage MCP Workloads (User Story 3)
 - ✅ Phase 5: GitHub Catalog Integration (User Story 4 - Documentation)
-- 🔄 Phase 6: Polish & Production Readiness (in progress)
-  - ✅ Loading states, error boundaries, empty states
-  - ✅ Breadcrumb navigation
-  - ✅ Entity type filters and global search
-  - ✅ Accessibility (ARIA labels, keyboard navigation)
-  - ✅ Unit tests (ServersTab, searchService, validationService)
-  - 📋 Remaining unit tests (6 components)
-  - 📋 Integration tests (Cypress)
+- ✅ Phase 6: Editing Capabilities (User Story: Disable/Enable Tools)
+ - ✅ Authentication & CSRF token handling
+ - ✅ YAML entity support (catalog + database merge)
+ - ✅ Disabled state persistence
+ - ✅ Checkbox UI state management fix
+ - ✅ Documentation (MERGE-ARCHITECTURE.md, YAML-ENTITY-FIX.md, CHECKBOX-UI-FIX.md)
+- 🔄 Phase 7: Polish & Production Readiness (in progress)
+ - ✅ Loading states, error boundaries, empty states
+ - ✅ Breadcrumb navigation
+ - ✅ Entity type filters and global search
+ - ✅ Accessibility (ARIA labels, keyboard navigation)
+ - ✅ Unit tests (ServersTab, searchService, validationService)
+ - 📋 Remaining unit tests (6 components)
+ - 📋 Integration tests (Cypress)
 
 ## UI Features
 
@@ -124,8 +131,34 @@ All MCP entities are standard Backstage `Component` kind:
 
 ## Important Notes
 
-- This is an OpenShift Console dynamic plugin (frontend-only)
-- All data comes from Backstage Catalog API via console proxy
+- This is an OpenShift Console dynamic plugin (frontend + backend API)
+- MCP Entity API provides CRUD operations with SQLite database
+- **Merge Architecture**: MCP Entity API merges catalog entities (YAML) with database state (disabled flags)
+  - Catalog = source of truth (entity definitions from YAML)
+  - Database = runtime state (disabled/enabled, user modifications)
+  - API layer = merges on GET (see [MERGE-ARCHITECTURE.md](MERGE-ARCHITECTURE.md))
 - Locale files must match plugin name: `locales/en/plugin__mcp-catalog.json`
 - Container runs as non-root user on UBI9 nginx base image
 - Unit tests use Jest + React Testing Library
+
+## React Hooks Best Practices
+
+### State Management Patterns
+- **Batch Editing**: Use `useBatchToolState` for Save/Cancel workflows
+- **Optimistic Updates**: Use `useToolDisabledState` for immediate persistence
+- **Stable Callbacks**: Keep hook dependencies minimal (avoid frequently-changing state)
+- **New Object References**: Use destructuring/spread instead of mutation for reliable re-renders
+
+### Common Pitfalls
+- ❌ Don't use `delete` operator for removing properties (unreliable re-renders)
+- ❌ Don't include frequently-changing state in `useCallback` dependencies
+- ✅ Use destructuring to create new objects when removing properties
+- ✅ Access latest state through setter function's `prev` parameter
+
+## Related Documentation
+
+- [CHECKBOX-UI-FIX.md](./CHECKBOX-UI-FIX.md) - Checkbox UI state management fix
+- [MERGE-ARCHITECTURE.md](./MERGE-ARCHITECTURE.md) - Catalog + database merge pattern
+- [DISABLE-TOOLS-FIX-COMPLETE.md](./DISABLE-TOOLS-FIX-COMPLETE.md) - Disable feature documentation
+- [AUTHENTICATION.md](./AUTHENTICATION.md) - Authentication architecture
+- [DOCUMENTATION-INDEX.md](./DOCUMENTATION-INDEX.md) - Complete documentation index

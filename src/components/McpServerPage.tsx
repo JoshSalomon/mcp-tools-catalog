@@ -24,7 +24,11 @@ import { Breadcrumbs, createMcpCatalogBreadcrumbs } from './shared/Breadcrumbs';
 import { CatalogMcpServer, CATALOG_MCP_SERVER_KIND } from '../models/CatalogMcpServer';
 import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE, isToolDisabled } from '../models/CatalogMcpTool';
 import { useCatalogEntity, useCatalogEntities } from '../services/catalogService';
+import { useBatchToolState } from '../hooks/useBatchToolState';
+import { useCanEditCatalog } from '../services/authService';
 import { DisabledCheckbox } from './shared/DisabledCheckbox';
+import { Button, Alert, Flex, FlexItem } from '@patternfly/react-core';
+import { CheckCircleIcon, TimesCircleIcon } from '@patternfly/react-icons';
 
 const McpServerPage: React.FC = () => {
   const params = useParams<{ name: string }>();
@@ -75,6 +79,34 @@ const McpServerPage: React.FC = () => {
     if (!tools) return [];
     return filterToolsByServer(tools, name);
   }, [tools, name]);
+
+  // Check if user has mcp-admin role for tool state editing
+  const { canEdit: canEditToolStates, loaded: authLoaded } = useCanEditCatalog();
+  
+  // Batch tool state management
+  const handleToolStateSaveComplete = React.useCallback((updatedTools: CatalogMcpTool[]) => {
+    // Force a refresh by triggering a re-fetch
+    // The useCatalogEntities hook will automatically refetch when dependencies change
+    // For now, we'll rely on the component re-rendering after save
+    window.location.reload(); // Simple approach - could be optimized with state management
+  }, []);
+  
+  const batchToolState = useBatchToolState(serverTools, handleToolStateSaveComplete);
+  
+  // Handle tool toggle for batch editing
+  const handleToolToggle = React.useCallback((tool: CatalogMcpTool) => {
+    batchToolState.toggleTool(tool);
+  }, [batchToolState]);
+  
+  // Handle save
+  const handleSave = React.useCallback(async () => {
+    await batchToolState.save();
+  }, [batchToolState]);
+  
+  // Handle cancel
+  const handleCancel = React.useCallback(() => {
+    batchToolState.cancel();
+  }, [batchToolState]);
 
   if (!serverLoaded || !toolsLoaded) {
     return (
@@ -189,46 +221,136 @@ const McpServerPage: React.FC = () => {
                 </EmptyStateBody>
               </EmptyState>
             ) : (
-              <Table aria-label="Provided Tools Table" variant="compact">
-                <Thead>
-                  <Tr>
-                    <Th>Name</Th>
-                    <Th>Type</Th>
-                    <Th>Lifecycle</Th>
-                    <Th>Owner</Th>
-                    <Th>Status</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {serverTools.map((tool) => {
-                    const disabled = isToolDisabled(tool);
-                    const rowStyle = disabled ? { opacity: 0.6, backgroundColor: '#f5f5f5' } : undefined;
-                    return (
-                      <Tr key={tool.metadata.uid || tool.metadata.name} style={rowStyle}>
-                        <Td dataLabel="Name">
-                          <a
-                            href="#"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              history.push(
-                                `/mcp-catalog/tools/${tool.metadata.name}?namespace=${tool.metadata.namespace || 'default'}`
-                              );
-                            }}
-                          >
-                            {tool.metadata.name}
-                          </a>
-                        </Td>
-                        <Td dataLabel="Type">{tool.spec.type}</Td>
-                        <Td dataLabel="Lifecycle">{tool.spec.lifecycle}</Td>
-                        <Td dataLabel="Owner">{tool.spec.owner}</Td>
-                        <Td dataLabel="Status">
-                          <DisabledCheckbox tool={tool} />
-                        </Td>
-                      </Tr>
-                    );
-                  })}
-                </Tbody>
-              </Table>
+              <>
+                {/* Error display for batch editing */}
+                {authLoaded && canEditToolStates && batchToolState.error && (
+                  <Alert
+                    variant="danger"
+                    title="Failed to save tool state changes"
+                    isInline
+                    actionClose={<Button variant="plain" onClick={batchToolState.clearError}>×</Button>}
+                    style={{ marginBottom: '1rem' }}
+                  >
+                    {batchToolState.error.message}
+                  </Alert>
+                )}
+                
+                {/* Save/Cancel buttons for batch editing */}
+                {authLoaded && canEditToolStates && (
+                  <Flex
+                    alignItems={{ default: 'alignItemsCenter' }}
+                    spaceItems={{ default: 'spaceItemsMd' }}
+                    style={{ marginBottom: '1rem' }}
+                  >
+                    <FlexItem>
+                      <Button
+                        variant="primary"
+                        onClick={handleSave}
+                        isDisabled={!batchToolState.hasChanges() || batchToolState.isSaving}
+                        icon={batchToolState.isSaving ? <Spinner size="sm" /> : <CheckCircleIcon />}
+                      >
+                        {batchToolState.isSaving ? 'Saving...' : 'Save'}
+                      </Button>
+                    </FlexItem>
+                    <FlexItem>
+                      <Button
+                        variant="secondary"
+                        onClick={handleCancel}
+                        isDisabled={!batchToolState.hasChanges() || batchToolState.isSaving}
+                        icon={<TimesCircleIcon />}
+                      >
+                        Cancel
+                      </Button>
+                    </FlexItem>
+                    {batchToolState.hasChanges() && (
+                      <FlexItem>
+                        <span style={{ fontSize: '0.875rem', color: '#6a6e73' }}>
+                          {batchToolState.pendingChanges.size} change{batchToolState.pendingChanges.size !== 1 ? 's' : ''} pending
+                        </span>
+                      </FlexItem>
+                    )}
+                  </Flex>
+                )}
+                
+                <Table aria-label="Provided Tools Table" variant="compact">
+                  <Thead>
+                    <Tr>
+                      <Th>Name</Th>
+                      <Th>Type</Th>
+                      <Th>Lifecycle</Th>
+                      <Th>Owner</Th>
+                      <Th>Status</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {serverTools.map((tool: CatalogMcpTool, index: number) => {
+                      const currentDisabledState = authLoaded && canEditToolStates 
+                        ? batchToolState.getToolState(tool)
+                        : isToolDisabled(tool);
+                      const rowStyle = currentDisabledState ? { opacity: 0.6, backgroundColor: '#f5f5f5' } : undefined;
+                      
+                      // Create tool with current state for DisabledCheckbox
+                      // Use destructuring to ensure React sees new object reference
+                      // See CHECKBOX-UI-FIX.md for why we use this pattern instead of delete
+                      const baseAnnotations = { ...tool.metadata.annotations };
+                      const { 'mcp-catalog.io/disabled': _, ...annotationsWithoutDisabled } = baseAnnotations;
+                      
+                      const annotations = currentDisabledState
+                        ? { ...annotationsWithoutDisabled, 'mcp-catalog.io/disabled': 'true' }
+                        : annotationsWithoutDisabled;
+                      
+                      const toolWithState: CatalogMcpTool = {
+                        ...tool,
+                        metadata: {
+                          ...tool.metadata,
+                          annotations,
+                        },
+                      };
+                      
+                      // Ensure all values are strings to avoid type errors
+                      const uidStr: string = String(tool.metadata.uid ?? '');
+                      const nameStr: string = String(tool.metadata.name ?? '');
+                      const fallbackKey: string = `tool-${index}`;
+                      const toolKey: string = uidStr || nameStr || fallbackKey || `tool-${index}`;
+                      const toolName: string = nameStr || '';
+                      return (
+                        <Tr key={toolKey} style={rowStyle}>
+                          <Td dataLabel="Name">
+                            <a
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                const toolNamespace = String(tool.metadata.namespace || 'default');
+                                if (toolName) {
+                                  history.push(
+                                    `/mcp-catalog/tools/${toolName}?namespace=${toolNamespace}`
+                                  );
+                                }
+                              }}
+                            >
+                              {toolName}
+                            </a>
+                          </Td>
+                          <Td dataLabel="Type">{String(tool.spec.type || '')}</Td>
+                          <Td dataLabel="Lifecycle">{String(tool.spec.lifecycle || '')}</Td>
+                          <Td dataLabel="Owner">{String(tool.spec.owner || '')}</Td>
+                          <Td dataLabel="Status">
+                            {authLoaded && canEditToolStates ? (
+                              <DisabledCheckbox 
+                                tool={toolWithState} 
+                                readOnly={false}
+                                onToggle={handleToolToggle}
+                              />
+                            ) : (
+                              <span>{currentDisabledState ? 'Disabled' : 'Enabled'}</span>
+                            )}
+                          </Td>
+                        </Tr>
+                      );
+                    })}
+                  </Tbody>
+                </Table>
+              </>
             )}
           </CardBody>
         </Card>

@@ -1,0 +1,289 @@
+openapi: 3.0.3
+info:
+  title: MCP Editing Capabilities Frontend API
+  description: |
+    Frontend API service interfaces for editing capabilities in the MCP Tools Catalog.
+    These are TypeScript service methods that call the existing Entity Management API
+    (spec 003) backend endpoints.
+  version: 1.0.0
+  contact:
+    name: MCP Tools Catalog Team
+
+servers:
+  - url: /api/proxy/plugin/mcp-catalog/backstage/api/mcp-entity-api
+    description: Backstage Entity Management API proxy endpoint
+
+tags:
+  - name: tool-states
+    description: Tool enable/disable state management
+  - name: workloads
+    description: Workload CRUD operations
+
+paths:
+  # Tool state updates use existing annotation mechanism
+  # No new endpoints - uses catalog annotation update pattern
+
+  /workloads:
+    post:
+      tags: [workloads]
+      summary: Create a new MCP Workload
+      description: |
+        Creates a new workload entity. Requires mcp-user role.
+        Frontend service method wraps POST /api/mcp-entity-api/workloads
+      operationId: createWorkload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkloadInput'
+      responses:
+        '201':
+          description: Workload created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkloadEntity'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /workloads/{namespace}/{name}:
+    parameters:
+      - $ref: '#/components/parameters/namespace'
+      - $ref: '#/components/parameters/name'
+
+    get:
+      tags: [workloads]
+      summary: Get a workload by name
+      description: |
+        Fetches workload entity for editing or conflict detection.
+        Frontend service method wraps GET /api/mcp-entity-api/workloads/{namespace}/{name}
+      operationId: getWorkload
+      responses:
+        '200':
+          description: Workload details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkloadEntity'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [workloads]
+      summary: Update an MCP Workload
+      description: |
+        Updates an existing workload entity. Requires mcp-user role.
+        Frontend service method wraps PUT /api/mcp-entity-api/workloads/{namespace}/{name}
+      operationId: updateWorkload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkloadInput'
+      responses:
+        '200':
+          description: Workload updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkloadEntity'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+    delete:
+      tags: [workloads]
+      summary: Delete an MCP Workload
+      description: |
+        Deletes a workload entity. Requires mcp-user role.
+        Frontend service method wraps DELETE /api/mcp-entity-api/workloads/{namespace}/{name}
+      operationId: deleteWorkload
+      responses:
+        '204':
+          description: Workload deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    namespace:
+      name: namespace
+      in: path
+      required: true
+      schema:
+        type: string
+        example: default
+      description: Workload namespace
+
+    name:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+        example: my-workload
+      description: Workload name
+
+  schemas:
+    WorkloadInput:
+      type: object
+      required:
+        - metadata
+        - spec
+      properties:
+        metadata:
+          type: object
+          required:
+            - name
+            - namespace
+          properties:
+            name:
+              type: string
+              description: Workload name (required)
+              example: my-workload
+            namespace:
+              type: string
+              description: Workload namespace (required)
+              example: default
+            description:
+              type: string
+              description: Workload description (optional)
+              example: Sample workload for testing
+          additionalProperties: true
+        spec:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [mcp-workload, workflow, service]
+              description: Workload type
+              example: mcp-workload
+            lifecycle:
+              type: string
+              description: Lifecycle stage (optional)
+              example: experimental
+            owner:
+              type: string
+              description: Owner entity reference (optional)
+              example: user:default/admin
+            dependsOn:
+              type: array
+              items:
+                type: string
+              description: Array of tool entity references (optional, can be empty)
+              example:
+                - component:default/github-create-issue
+                - component:default/file-read
+          additionalProperties: true
+
+    WorkloadEntity:
+      allOf:
+        - $ref: '#/components/schemas/WorkloadInput'
+        - type: object
+          properties:
+            metadata:
+              type: object
+              properties:
+                uid:
+                  type: string
+                  description: Unique entity identifier
+                lastModified:
+                  type: string
+                  format: date-time
+                  description: Last modification timestamp (used for conflict detection)
+              required:
+                - uid
+                - lastModified
+
+  responses:
+    ValidationError:
+      description: Validation error - required fields missing or invalid
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: ValidationError
+              message:
+                type: string
+                example: Name and namespace are required
+              details:
+                type: object
+                additionalProperties: true
+
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Unauthorized
+              message:
+                type: string
+                example: Authentication required
+
+    Forbidden:
+      description: User lacks required role (mcp-user or mcp-admin)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Forbidden
+              message:
+                type: string
+                example: User lacks mcp-user role
+
+    Conflict:
+      description: Entity conflict (e.g., name already exists, concurrent edit)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: ConflictError
+              message:
+                type: string
+                example: Workload already exists
+
+    NotFound:
+      description: Entity not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: NotFoundError
+              message:
+                type: string
+                example: Workload not found
