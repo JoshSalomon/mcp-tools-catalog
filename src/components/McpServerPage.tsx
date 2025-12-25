@@ -58,7 +58,8 @@ const McpServerPage: React.FC = () => {
   const [server, serverLoaded, serverError] = useCatalogEntity<CatalogMcpServer>(
     CATALOG_MCP_SERVER_KIND, 
     shouldFetch ? name : '__placeholder__', 
-    namespace
+    namespace,
+    location.key  // Simple cache key
   );
 
   // Fetch all tools to find ones provided by this server

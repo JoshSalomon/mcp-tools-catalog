@@ -16,16 +16,21 @@ import {
   MenuList,
   MenuItem,
   Popover,
+  PageSection,
+  Alert,
 } from '@patternfly/react-core';
-import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { CubeIcon, SearchIcon } from '@patternfly/react-icons';
+import { Table, Thead, Tr, Th, Tbody, Td, ActionsColumn } from '@patternfly/react-table';
+import { CubeIcon, SearchIcon, PlusIcon } from '@patternfly/react-icons';
 import { filterResources } from '../services/searchService';
 import { usePerformanceMonitor } from '../utils/performanceMonitor';
 import { Pagination } from './shared/Pagination';
 import { CatalogMcpWorkload, CATALOG_MCP_WORKLOAD_KIND } from '../models/CatalogMcpWorkload';
 import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE } from '../models/CatalogMcpTool';
-import { useCatalogEntities } from '../services/catalogService';
+import { CatalogMcpServer, CATALOG_MCP_SERVER_KIND, CATALOG_MCP_SERVER_TYPE } from '../models/CatalogMcpServer';
+import { useCatalogEntities, createWorkload, updateWorkload, deleteWorkload } from '../services/catalogService';
+import { useCanEditWorkloads } from '../services/authService';
 import { getEntityName } from '../utils/hierarchicalNaming';
+import { WorkloadForm } from './WorkloadForm';
 
 interface WorkloadsTabProps {
   /** Initial search term from parent component */
@@ -39,6 +44,12 @@ const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
   const [isToolFilterOpen, setIsToolFilterOpen] = React.useState(false);
   const [page, setPage] = React.useState(1);
   const [perPage, setPerPage] = React.useState(100);
+  const [showCreateForm, setShowCreateForm] = React.useState(false);
+  const [editingWorkload, setEditingWorkload] = React.useState<CatalogMcpWorkload | null>(null);
+  const [deleteError, setDeleteError] = React.useState<Error | null>(null);
+  
+  // Check if user can edit workloads
+  const { canEdit: canEditWorkloads, loaded: authLoaded } = useCanEditWorkloads();
   
   // Sync with parent search term
   React.useEffect(() => {
@@ -55,17 +66,102 @@ const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
     undefined // Don't filter by type here, we'll do client-side filtering
   );
 
-  // Fetch all tools for the filter dropdown
+  // Fetch all tools for the filter dropdown and form
   const [allTools, toolsLoaded] = useCatalogEntities<CatalogMcpTool>(
     CATALOG_MCP_TOOL_KIND,
     CATALOG_MCP_TOOL_TYPE
   );
 
+  // Fetch all servers for the form
+  const [allServers, serversLoaded] = useCatalogEntities<CatalogMcpServer>(
+    CATALOG_MCP_SERVER_KIND,
+    CATALOG_MCP_SERVER_TYPE
+  );
+
   React.useEffect(() => {
-    if (workloadsLoaded && toolsLoaded) {
+    if (workloadsLoaded && toolsLoaded && serversLoaded) {
       stopPerfMonitor();
     }
-  }, [workloadsLoaded, toolsLoaded, stopPerfMonitor]);
+  }, [workloadsLoaded, toolsLoaded, serversLoaded, stopPerfMonitor]);
+
+  // Handle create workload
+  const handleCreateWorkload = React.useCallback(async (formData: any) => {
+    const workloadData = {
+      metadata: {
+        name: formData.name,
+        namespace: formData.namespace,
+        description: formData.description || undefined,
+      },
+      spec: {
+        type: 'mcp-workload',
+        lifecycle: formData.lifecycle || undefined,
+        owner: formData.owner || undefined,
+        dependsOn: Array.from(formData.selectedTools) as string[],
+      },
+    };
+
+    await createWorkload(workloadData);
+    setShowCreateForm(false);
+    
+    // Navigate with timestamp to force cache invalidation (faster than full page reload)
+    history.push(
+      `/mcp-catalog/workloads/${formData.name}?namespace=${formData.namespace}&t=${Date.now()}`
+    );
+  }, [history]);
+
+  // Handle cancel create
+  const handleCancelCreate = React.useCallback(() => {
+    setShowCreateForm(false);
+  }, []);
+
+  // Handle edit workload
+  const handleEditWorkload = React.useCallback(async (formData: any) => {
+    if (!editingWorkload) return;
+
+    const workloadData = {
+      metadata: {
+        description: formData.description || undefined,
+      },
+      spec: {
+        type: editingWorkload.spec.type || 'mcp-workload',
+        lifecycle: formData.lifecycle || undefined,
+        owner: formData.owner || undefined,
+        dependsOn: Array.from(formData.selectedTools) as string[],
+      },
+    };
+
+    await updateWorkload(
+      editingWorkload.metadata.namespace || 'default',
+      editingWorkload.metadata.name,
+      workloadData
+    );
+    
+    // Navigate with timestamp to force cache invalidation (faster than full page reload)
+    history.push(
+      `/mcp-catalog/workloads/${editingWorkload.metadata.name}?namespace=${editingWorkload.metadata.namespace || 'default'}&t=${Date.now()}`
+    );
+    setEditingWorkload(null);
+  }, [editingWorkload, history]);
+
+  // Handle cancel edit
+  const handleCancelEdit = React.useCallback(() => {
+    setEditingWorkload(null);
+  }, []);
+
+  // Handle delete workload
+  const handleDeleteWorkload = React.useCallback(async (workload: CatalogMcpWorkload) => {
+    setDeleteError(null);
+    try {
+      await deleteWorkload(
+        workload.metadata.namespace || 'default',
+        workload.metadata.name
+      );
+      // Refresh the list by reloading
+      window.location.reload();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err : new Error(String(err)));
+    }
+  }, []);
 
   // Filter to only show entities with spec.type = 'workflow', 'service', or 'mcp-workload'
   // Also check label mcp-catalog.io/type === 'workload' as fallback
@@ -197,11 +293,42 @@ const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
     return getWorkloadToolRefs(workload).length;
   };
 
-  if (!workloadsLoaded || !toolsLoaded) {
+  if (!workloadsLoaded || !toolsLoaded || !serversLoaded || !authLoaded) {
     return (
       <Bullseye>
         <Spinner size="xl" />
       </Bullseye>
+    );
+  }
+
+  // Show create form if requested
+  if (showCreateForm) {
+    return (
+      <PageSection>
+        <WorkloadForm
+          servers={allServers}
+          tools={allTools}
+          onSave={handleCreateWorkload}
+          onCancel={handleCancelCreate}
+          isEditMode={false}
+        />
+      </PageSection>
+    );
+  }
+
+  // Show edit form if requested
+  if (editingWorkload) {
+    return (
+      <PageSection>
+        <WorkloadForm
+          initialWorkload={editingWorkload}
+          servers={allServers}
+          tools={allTools}
+          onSave={handleEditWorkload}
+          onCancel={handleCancelEdit}
+          isEditMode={true}
+        />
+      </PageSection>
     );
   }
 
@@ -222,6 +349,18 @@ const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
     <>
       <Toolbar>
         <ToolbarContent>
+          <ToolbarItem>
+            {canEditWorkloads && (
+              <Button
+                variant="primary"
+                icon={<PlusIcon />}
+                onClick={() => setShowCreateForm(true)}
+                aria-label="Create new workload"
+              >
+                Create
+              </Button>
+            )}
+          </ToolbarItem>
           <ToolbarItem>
             <SearchInput
               placeholder="Find workload by name..."
@@ -294,46 +433,82 @@ const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
           </EmptyStateBody>
         </EmptyState>
       ) : (
-        <Table aria-label="MCP Workloads Table" variant="compact">
-          <Thead>
-            <Tr>
-              <Th>Name</Th>
-              <Th>Namespace</Th>
-              <Th>Type</Th>
-              <Th>Lifecycle</Th>
-              <Th>Owner</Th>
-              <Th>Tools</Th>
-            </Tr>
-          </Thead>
-          <Tbody>
-            {paginatedWorkloads.map((workload) => {
-              const toolsCount = getToolsCount(workload);
-              
-              return (
-                <Tr key={workload.metadata.uid || `${workload.metadata.namespace}/${workload.metadata.name}`}>
-                  <Td dataLabel="Name">
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        history.push(
-                          `/mcp-catalog/workloads/${workload.metadata.name}?namespace=${workload.metadata.namespace || 'default'}`
-                        );
-                      }}
-                    >
-                      {workload.metadata.name}
-                    </a>
-                  </Td>
-                  <Td dataLabel="Namespace">{workload.metadata.namespace || 'default'}</Td>
-                  <Td dataLabel="Type">{workload.spec.type}</Td>
-                  <Td dataLabel="Lifecycle">{workload.spec.lifecycle}</Td>
-                  <Td dataLabel="Owner">{workload.spec.owner}</Td>
-                  <Td dataLabel="Tools">{toolsCount}</Td>
-                </Tr>
-              );
-            })}
-          </Tbody>
-        </Table>
+        <>
+          {deleteError && (
+            <Alert
+              variant="danger"
+              title="Failed to delete workload"
+              isInline
+              actionClose={<Button variant="plain" onClick={() => setDeleteError(null)}>×</Button>}
+              style={{ marginBottom: '1rem' }}
+            >
+              {deleteError.message}
+            </Alert>
+          )}
+          
+          <Table aria-label="MCP Workloads Table" variant="compact">
+            <Thead>
+              <Tr>
+                <Th>Name</Th>
+                <Th>Namespace</Th>
+                <Th>Type</Th>
+                <Th>Lifecycle</Th>
+                <Th>Owner</Th>
+                <Th>Tools</Th>
+                {canEditWorkloads && <Th>Actions</Th>}
+              </Tr>
+            </Thead>
+            <Tbody>
+              {paginatedWorkloads.map((workload) => {
+                const toolsCount = getToolsCount(workload);
+                
+                return (
+                  <Tr key={workload.metadata.uid || `${workload.metadata.namespace}/${workload.metadata.name}`}>
+                    <Td dataLabel="Name">
+                      <a
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          history.push(
+                            `/mcp-catalog/workloads/${workload.metadata.name}?namespace=${workload.metadata.namespace || 'default'}`
+                          );
+                        }}
+                      >
+                        {workload.metadata.name}
+                      </a>
+                    </Td>
+                    <Td dataLabel="Namespace">{workload.metadata.namespace || 'default'}</Td>
+                    <Td dataLabel="Type">{workload.spec.type}</Td>
+                    <Td dataLabel="Lifecycle">{workload.spec.lifecycle}</Td>
+                    <Td dataLabel="Owner">{workload.spec.owner}</Td>
+                    <Td dataLabel="Tools">{toolsCount}</Td>
+                    {canEditWorkloads && (
+                      <Td dataLabel="Actions">
+                        <ActionsColumn
+                          items={[
+                            {
+                              title: 'Edit',
+                              onClick: () => setEditingWorkload(workload),
+                            },
+                            {
+                              title: 'Delete',
+                              onClick: () => {
+                                if (window.confirm(`Are you sure you want to delete workload "${workload.metadata.name}"?`)) {
+                                  handleDeleteWorkload(workload);
+                                }
+                              },
+                              isSeparator: false,
+                            },
+                          ]}
+                        />
+                      </Td>
+                    )}
+                  </Tr>
+                );
+              })}
+            </Tbody>
+          </Table>
+        </>
       )}
     </>
   );

@@ -55,10 +55,12 @@ const McpWorkloadPage: React.FC = () => {
   const shouldFetch = Boolean(name);
 
   // Fetch workload entity
+  // Use full search string as cache key - timestamp parameter forces refetch after edits
   const [workload, workloadLoaded, workloadError] = useCatalogEntity<CatalogMcpWorkload>(
     CATALOG_MCP_WORKLOAD_KIND,
     shouldFetch ? name : '__placeholder__',
-    namespace
+    namespace,
+    location.search  // Full query string includes timestamp, forcing refetch when changed
   );
 
   // Fetch all tools for reference resolution and validation
@@ -84,6 +86,11 @@ const McpWorkloadPage: React.FC = () => {
     if (!workload) return [];
     
     const refs: string[] = [];
+    
+    // Check spec.dependsOn first (primary source for tool dependencies)
+    if (workload.spec.dependsOn) {
+      refs.push(...workload.spec.dependsOn);
+    }
     
     // Check spec.consumes array
     if (workload.spec.consumes) {
@@ -296,7 +303,9 @@ const McpWorkloadPage: React.FC = () => {
               <DescriptionListGroup>
                 <DescriptionListTerm>Description</DescriptionListTerm>
                 <DescriptionListDescription>
-                  {workload.metadata.description || 'No description available'}
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {workload.metadata.description || 'No description available'}
+                  </div>
                 </DescriptionListDescription>
               </DescriptionListGroup>
               <DescriptionListGroup>

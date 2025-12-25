@@ -51,7 +51,8 @@ const McpToolPage: React.FC = () => {
   const [tool, toolLoaded, toolError] = useCatalogEntity<CatalogMcpTool>(
     CATALOG_MCP_TOOL_KIND,
     shouldFetch ? name : '__placeholder__',
-    namespace
+    namespace,
+    location.key  // Simple cache key
   );
 
   // Fetch all servers to find parent server

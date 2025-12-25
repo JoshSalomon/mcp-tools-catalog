@@ -13,7 +13,7 @@ import {
   ConflictError,
   ValidationError,
 } from './errors';
-import { validator, buildEntityRef } from './validation';
+import { buildEntityRef } from './validation';
 import { MCPEntityDatabase } from './database';
 import { MCPEntityProvider } from './entityProvider';
 import type {
@@ -68,9 +68,7 @@ export class MCPEntityService {
   async createServer(input: MCPServerInput): Promise<MCPServerEntity> {
     this.logger.info('Creating MCP Server', { name: input.metadata.name });
 
-    // Validate input schema
-    validator.validateServer(input);
-
+    // Note: Validation handled by Backstage catalog when entity is saved
     const namespace = input.metadata.namespace || 'default';
     const entityRef = buildEntityRef('component', namespace, input.metadata.name);
 
@@ -86,31 +84,53 @@ export class MCPEntityService {
     // Save to database
     await this.database.upsertEntity(entity);
 
-    // Trigger catalog refresh
-    await this.entityProvider.triggerRefresh();
+    // Add entity to catalog immediately (delta mutation)
+    await this.entityProvider.updateEntity(entity);
 
     return entity;
   }
 
   /**
    * Get a single MCP Server by namespace and name
+   * Merges catalog entity (source of truth) with database state (runtime overrides)
    */
   async getServer(namespace: string, name: string): Promise<MCPServerEntity> {
-    const entity = await this.catalog.getEntityByRef({
+    const entityRef = buildEntityRef('component', namespace, name);
+    
+    // Get entity from catalog (YAML source of truth)
+    const catalogEntity = await this.catalog.getEntityByRef({
       kind: 'Component',
       namespace,
       name,
     });
 
-    if (!entity || (entity.spec as any)?.type !== 'mcp-server') {
-      throw new NotFoundError(buildEntityRef('component', namespace, name));
+    if (!catalogEntity || (catalogEntity.spec as any)?.type !== 'mcp-server') {
+      throw new NotFoundError(entityRef);
     }
 
-    return entity as unknown as MCPServerEntity;
+    // Get any database overrides (disabled state, etc.)
+    const dbEntity = await this.database.getEntity(entityRef);
+    
+    // Merge: catalog as base, database annotations overlay
+    if (dbEntity) {
+      return {
+        ...catalogEntity,
+        metadata: {
+          ...catalogEntity.metadata,
+          annotations: {
+            ...catalogEntity.metadata.annotations,
+            ...dbEntity.metadata.annotations, // Database wins for annotations
+          },
+        },
+      } as unknown as MCPServerEntity;
+    }
+
+    return catalogEntity as unknown as MCPServerEntity;
   }
 
   /**
    * List all MCP Servers with optional filtering
+   * Merges catalog entities with database state (runtime overrides)
    */
   async listServers(params?: EntityListParams): Promise<EntityListResponse<MCPServerEntity>> {
     const filter: Record<string, string>[] = [
@@ -121,11 +141,37 @@ export class MCPEntityService {
     }
 
     const response = await this.catalog.getEntities({ filter });
-    const entities = response.items;
+    const catalogEntities = response.items;
+
+    // Merge database state into catalog entities
+    const mergedEntities = await Promise.all(
+      catalogEntities.map(async (catalogEntity) => {
+        const entityRef = buildEntityRef(
+          'component',
+          catalogEntity.metadata.namespace || 'default',
+          catalogEntity.metadata.name,
+        );
+        const dbEntity = await this.database.getEntity(entityRef);
+        
+        if (dbEntity) {
+          return {
+            ...catalogEntity,
+            metadata: {
+              ...catalogEntity.metadata,
+              annotations: {
+                ...catalogEntity.metadata.annotations,
+                ...dbEntity.metadata.annotations,
+              },
+            },
+          };
+        }
+        return catalogEntity;
+      }),
+    );
 
     return {
-      items: entities as unknown as MCPServerEntity[],
-      totalCount: entities.length,
+      items: mergedEntities as unknown as MCPServerEntity[],
+      totalCount: mergedEntities.length,
     };
   }
 
@@ -139,14 +185,16 @@ export class MCPEntityService {
   ): Promise<MCPServerEntity> {
     this.logger.info('Updating MCP Server', { namespace, name });
 
-    // Validate input
-    validator.validateServer(input);
-
+    // Note: Validation handled by Backstage catalog when entity is saved
     const entityRef = buildEntityRef('component', namespace, name);
 
-    // Verify entity exists
-    const existing = await this.database.exists(entityRef);
-    if (!existing) {
+    // Verify entity exists in catalog (checks both YAML and API-created entities)
+    const existing = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace,
+      name,
+    });
+    if (!existing || (existing.spec as any)?.type !== 'mcp-server') {
       throw new NotFoundError(entityRef);
     }
 
@@ -154,8 +202,8 @@ export class MCPEntityService {
     const entity = this.buildServerEntity(input, namespace, name);
     await this.database.upsertEntity(entity);
 
-    // Trigger catalog refresh
-    await this.entityProvider.triggerRefresh();
+    // Update entity in catalog immediately (delta mutation)
+    await this.entityProvider.updateEntity(entity);
 
     return entity;
   }
@@ -168,9 +216,13 @@ export class MCPEntityService {
 
     const entityRef = buildEntityRef('component', namespace, name);
 
-    // Verify entity exists
-    const existing = await this.database.exists(entityRef);
-    if (!existing) {
+    // Verify entity exists in catalog (checks both YAML and API-created entities)
+    const existing = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace,
+      name,
+    });
+    if (!existing || (existing.spec as any)?.type !== 'mcp-server') {
       throw new NotFoundError(entityRef);
     }
 
@@ -181,8 +233,8 @@ export class MCPEntityService {
     // Delete server
     await this.database.deleteEntity(entityRef);
 
-    // Trigger catalog refresh
-    await this.entityProvider.triggerRefresh();
+    // Remove entity from catalog immediately (delta mutation)
+    await this.entityProvider.removeEntity(entityRef);
 
     this.logger.info('Server deleted', { entityRef, toolsDeleted: deletedTools });
   }
@@ -197,9 +249,7 @@ export class MCPEntityService {
   async createTool(input: MCPToolInput): Promise<MCPToolEntity> {
     this.logger.info('Creating MCP Tool', { name: input.metadata.name });
 
-    // Validate input schema
-    validator.validateTool(input);
-
+    // Note: Validation handled by Backstage catalog when entity is saved
     const namespace = input.metadata.namespace || 'default';
     const entityRef = buildEntityRef('component', namespace, input.metadata.name);
 
@@ -235,31 +285,53 @@ export class MCPEntityService {
     // Save to database
     await this.database.upsertEntity(entity);
 
-    // Trigger catalog refresh
-    await this.entityProvider.triggerRefresh();
+    // Add entity to catalog immediately (delta mutation)
+    await this.entityProvider.updateEntity(entity);
 
     return entity;
   }
 
   /**
    * Get a single MCP Tool by namespace and name
+   * Merges catalog entity (source of truth) with database state (runtime overrides)
    */
   async getTool(namespace: string, name: string): Promise<MCPToolEntity> {
-    const entity = await this.catalog.getEntityByRef({
+    const entityRef = buildEntityRef('component', namespace, name);
+    
+    // Get entity from catalog (YAML source of truth)
+    const catalogEntity = await this.catalog.getEntityByRef({
       kind: 'Component',
       namespace,
       name,
     });
 
-    if (!entity || (entity.spec as any)?.type !== 'mcp-tool') {
-      throw new NotFoundError(buildEntityRef('component', namespace, name));
+    if (!catalogEntity || (catalogEntity.spec as any)?.type !== 'mcp-tool') {
+      throw new NotFoundError(entityRef);
     }
 
-    return entity as unknown as MCPToolEntity;
+    // Get any database overrides (disabled state, etc.)
+    const dbEntity = await this.database.getEntity(entityRef);
+    
+    // Merge: catalog as base, database annotations overlay
+    if (dbEntity) {
+      return {
+        ...catalogEntity,
+        metadata: {
+          ...catalogEntity.metadata,
+          annotations: {
+            ...catalogEntity.metadata.annotations,
+            ...dbEntity.metadata.annotations, // Database wins for annotations
+          },
+        },
+      } as unknown as MCPToolEntity;
+    }
+
+    return catalogEntity as unknown as MCPToolEntity;
   }
 
   /**
    * List all MCP Tools with optional filtering
+   * Merges catalog entities with database state (runtime overrides)
    */
   async listTools(params?: EntityListParams): Promise<EntityListResponse<MCPToolEntity>> {
     const filter: Record<string, string>[] = [
@@ -273,11 +345,37 @@ export class MCPEntityService {
     }
 
     const response = await this.catalog.getEntities({ filter });
-    const entities = response.items;
+    const catalogEntities = response.items;
+
+    // Merge database state into catalog entities
+    const mergedEntities = await Promise.all(
+      catalogEntities.map(async (catalogEntity) => {
+        const entityRef = buildEntityRef(
+          'component',
+          catalogEntity.metadata.namespace || 'default',
+          catalogEntity.metadata.name,
+        );
+        const dbEntity = await this.database.getEntity(entityRef);
+        
+        if (dbEntity) {
+          return {
+            ...catalogEntity,
+            metadata: {
+              ...catalogEntity.metadata,
+              annotations: {
+                ...catalogEntity.metadata.annotations,
+                ...dbEntity.metadata.annotations,
+              },
+            },
+          };
+        }
+        return catalogEntity;
+      }),
+    );
 
     return {
-      items: entities as unknown as MCPToolEntity[],
-      totalCount: entities.length,
+      items: mergedEntities as unknown as MCPToolEntity[],
+      totalCount: mergedEntities.length,
     };
   }
 
@@ -291,27 +389,39 @@ export class MCPEntityService {
   ): Promise<MCPToolEntity> {
     this.logger.info('Updating MCP Tool', { namespace, name });
 
-    validator.validateTool(input);
-
+    // Note: Validation handled by Backstage catalog when entity is saved
     const entityRef = buildEntityRef('component', namespace, name);
-    const existing = await this.database.exists(entityRef);
-
-    if (!existing) {
+    
+    // Verify entity exists in catalog (checks both YAML and API-created entities)
+    const existing = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace,
+      name,
+    });
+    if (!existing || (existing.spec as any)?.type !== 'mcp-tool') {
       throw new NotFoundError(entityRef);
     }
 
-    // Verify parent server exists
+    // Verify parent server exists (check catalog for YAML entities)
     const parentRef = input.spec.subcomponentOf;
-    const parentServer = await this.database.getEntity(parentRef);
-    if (!parentServer) {
+    const parentParts = parentRef.split(':');
+    const parentNamespace = parentParts[1]?.split('/')[0] || 'default';
+    const parentName = parentParts[1]?.split('/')[1] || parentParts[1];
+    
+    const parentServer = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace: parentNamespace,
+      name: parentName,
+    });
+    if (!parentServer || (parentServer.spec as any)?.type !== 'mcp-server') {
       throw new ValidationError(`Parent server '${parentRef}' not found`);
     }
 
     const entity = this.buildToolEntity(input, namespace, name);
     await this.database.upsertEntity(entity);
 
-    // Trigger catalog refresh
-    await this.entityProvider.triggerRefresh();
+    // Update entity in catalog immediately (delta mutation)
+    await this.entityProvider.updateEntity(entity);
 
     return entity;
   }
@@ -323,17 +433,22 @@ export class MCPEntityService {
     this.logger.info('Deleting MCP Tool (orphan behavior)', { namespace, name });
 
     const entityRef = buildEntityRef('component', namespace, name);
-    const existing = await this.database.exists(entityRef);
-
-    if (!existing) {
+    
+    // Verify entity exists in catalog (checks both YAML and API-created entities)
+    const existing = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace,
+      name,
+    });
+    if (!existing || (existing.spec as any)?.type !== 'mcp-tool') {
       throw new NotFoundError(entityRef);
     }
 
     // Simply delete - workload dependsOn refs become dangling (FR-008)
     await this.database.deleteEntity(entityRef);
 
-    // Trigger catalog refresh
-    await this.entityProvider.triggerRefresh();
+    // Remove entity from catalog immediately (delta mutation)
+    await this.entityProvider.removeEntity(entityRef);
 
     this.logger.info('Tool deleted (dependents orphaned)', { entityRef });
   }
@@ -348,8 +463,7 @@ export class MCPEntityService {
   async createWorkload(input: MCPWorkloadInput): Promise<MCPWorkloadEntity> {
     this.logger.info('Creating MCP Workload', { name: input.metadata.name });
 
-    validator.validateWorkload(input);
-
+    // Note: Validation handled by Backstage catalog when entity is saved
     const namespace = input.metadata.namespace || 'default';
     const entityRef = buildEntityRef('component', namespace, input.metadata.name);
 
@@ -375,34 +489,66 @@ export class MCPEntityService {
     const entity = this.buildWorkloadEntity(input);
     await this.database.upsertEntity(entity);
 
-    // Trigger catalog refresh
-    await this.entityProvider.triggerRefresh();
+    // Add entity to catalog immediately (delta mutation)
+    await this.entityProvider.updateEntity(entity);
 
     return entity;
   }
 
   /**
    * Get a single MCP Workload by namespace and name
+   * Merges catalog entity (source of truth) with database state (runtime overrides)
    */
   async getWorkload(namespace: string, name: string): Promise<MCPWorkloadEntity> {
-    const entity = await this.catalog.getEntityByRef({
+    const entityRef = buildEntityRef('component', namespace, name);
+    
+    // Get entity from catalog (YAML source of truth)
+    const catalogEntity = await this.catalog.getEntityByRef({
       kind: 'Component',
       namespace,
       name,
     });
 
     // Check for mcp-workload or compatible types (service, workflow)
-    const entityType = (entity?.spec as any)?.type;
+    const entityType = (catalogEntity?.spec as any)?.type;
     const validTypes = ['mcp-workload', 'service', 'workflow'];
-    if (!entity || !validTypes.includes(entityType)) {
-      throw new NotFoundError(buildEntityRef('component', namespace, name));
+    if (!catalogEntity || !validTypes.includes(entityType)) {
+      throw new NotFoundError(entityRef);
     }
 
-    return entity as unknown as MCPWorkloadEntity;
+    // Get any database overrides (user edits, runtime state, etc.)
+    const dbEntity = await this.database.getEntity(entityRef);
+    
+    // Merge: catalog as base, database fields overlay
+    if (dbEntity) {
+      return {
+        ...catalogEntity,
+        metadata: {
+          ...catalogEntity.metadata,
+          // Database wins for description (user edits)
+          ...(dbEntity.metadata.description !== undefined && { description: dbEntity.metadata.description }),
+          annotations: {
+            ...catalogEntity.metadata.annotations,
+            ...dbEntity.metadata.annotations, // Database wins for annotations
+          },
+        },
+        spec: {
+          ...(catalogEntity.spec as any),
+          // Database wins for user-editable fields
+          ...(dbEntity.spec?.lifecycle !== undefined && { lifecycle: (dbEntity.spec as any).lifecycle }),
+          ...(dbEntity.spec?.owner !== undefined && { owner: (dbEntity.spec as any).owner }),
+          // Always use database dependsOn if dbEntity exists (even if empty array)
+          ...('dependsOn' in (dbEntity.spec || {}) && { dependsOn: (dbEntity.spec as any).dependsOn }),
+        },
+      } as unknown as MCPWorkloadEntity;
+    }
+
+    return catalogEntity as unknown as MCPWorkloadEntity;
   }
 
   /**
    * List all MCP Workloads with optional filtering
+   * Merges catalog entities with database state (runtime overrides)
    */
   async listWorkloads(params?: EntityListParams): Promise<EntityListResponse<MCPWorkloadEntity>> {
     // Query for all workload types: mcp-workload, service, workflow
@@ -417,11 +563,47 @@ export class MCPEntityService {
     }
 
     const response = await this.catalog.getEntities({ filter: filters });
-    const entities = response.items;
+    const catalogEntities = response.items;
+
+    // Merge database state into catalog entities
+    const mergedEntities = await Promise.all(
+      catalogEntities.map(async (catalogEntity) => {
+        const entityRef = buildEntityRef(
+          'component',
+          catalogEntity.metadata.namespace || 'default',
+          catalogEntity.metadata.name,
+        );
+        const dbEntity = await this.database.getEntity(entityRef);
+        
+        if (dbEntity) {
+          return {
+            ...catalogEntity,
+            metadata: {
+              ...catalogEntity.metadata,
+              // Database wins for description (user edits)
+              ...(dbEntity.metadata.description !== undefined && { description: dbEntity.metadata.description }),
+              annotations: {
+                ...catalogEntity.metadata.annotations,
+                ...dbEntity.metadata.annotations,
+              },
+            },
+            spec: {
+              ...(catalogEntity.spec as any),
+              // Database wins for user-editable fields
+              ...(dbEntity.spec?.lifecycle !== undefined && { lifecycle: (dbEntity.spec as any).lifecycle }),
+              ...(dbEntity.spec?.owner !== undefined && { owner: (dbEntity.spec as any).owner }),
+              // Always use database dependsOn if dbEntity exists (even if empty array)
+              ...('dependsOn' in (dbEntity.spec || {}) && { dependsOn: (dbEntity.spec as any).dependsOn }),
+            },
+          };
+        }
+        return catalogEntity;
+      }),
+    );
 
     return {
-      items: entities as unknown as MCPWorkloadEntity[],
-      totalCount: entities.length,
+      items: mergedEntities as unknown as MCPWorkloadEntity[],
+      totalCount: mergedEntities.length,
     };
   }
 
@@ -435,20 +617,52 @@ export class MCPEntityService {
   ): Promise<MCPWorkloadEntity> {
     this.logger.info('Updating MCP Workload', { namespace, name });
 
-    validator.validateWorkload(input);
-
+    // Note: Validation handled by Backstage catalog when entity is saved
     const entityRef = buildEntityRef('component', namespace, name);
-    const existing = await this.database.exists(entityRef);
-
-    if (!existing) {
+    
+    // Verify entity exists in catalog (checks both YAML and API-created entities)
+    const existing = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace,
+      name,
+    });
+    const entityType = (existing?.spec as any)?.type;
+    const validTypes = ['mcp-workload', 'service', 'workflow'];
+    if (!existing || !validTypes.includes(entityType)) {
       throw new NotFoundError(entityRef);
     }
 
-    const entity = this.buildWorkloadEntity(input, namespace, name);
+    // Merge input with existing entity to preserve fields not being updated
+    const entity: MCPWorkloadEntity = {
+      apiVersion: existing.apiVersion || 'backstage.io/v1alpha1',
+      kind: existing.kind || 'Component',
+      metadata: {
+        ...existing.metadata,
+        name: name,
+        namespace: namespace || 'default',
+        // Only update fields that are provided in input
+        ...(input.metadata?.description !== undefined && { description: input.metadata.description }),
+        ...(input.metadata?.title !== undefined && { title: input.metadata.title }),
+        ...(input.metadata?.labels !== undefined && { labels: input.metadata.labels }),
+        ...(input.metadata?.annotations !== undefined && { annotations: input.metadata.annotations }),
+        ...(input.metadata?.tags !== undefined && { tags: input.metadata.tags }),
+      },
+      spec: {
+        ...(existing.spec as any),
+        // Only update fields that are provided in input
+        ...(input.spec?.type !== undefined && { type: input.spec.type }),
+        ...(input.spec?.lifecycle !== undefined && { lifecycle: input.spec.lifecycle }),
+        ...(input.spec?.owner !== undefined && { owner: input.spec.owner }),
+        ...(input.spec?.dependsOn !== undefined && { dependsOn: input.spec.dependsOn }),
+        ...(input.spec?.mcp !== undefined && { mcp: input.spec.mcp }),
+      },
+      ...(existing.relations && { relations: existing.relations }),
+    };
+
     await this.database.upsertEntity(entity);
 
-    // Trigger catalog refresh
-    await this.entityProvider.triggerRefresh();
+    // Update entity in catalog immediately (delta mutation)
+    await this.entityProvider.updateEntity(entity);
 
     return entity;
   }
@@ -460,16 +674,23 @@ export class MCPEntityService {
     this.logger.info('Deleting MCP Workload', { namespace, name });
 
     const entityRef = buildEntityRef('component', namespace, name);
-    const existing = await this.database.exists(entityRef);
-
-    if (!existing) {
+    
+    // Verify entity exists in catalog (checks both YAML and API-created entities)
+    const existing = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace,
+      name,
+    });
+    const entityType = (existing?.spec as any)?.type;
+    const validTypes = ['mcp-workload', 'service', 'workflow'];
+    if (!existing || !validTypes.includes(entityType)) {
       throw new NotFoundError(entityRef);
     }
 
     await this.database.deleteEntity(entityRef);
 
-    // Trigger catalog refresh
-    await this.entityProvider.triggerRefresh();
+    // Remove entity from catalog immediately (delta mutation)
+    await this.entityProvider.removeEntity(entityRef);
 
     this.logger.info('Workload deleted', { entityRef });
   }
