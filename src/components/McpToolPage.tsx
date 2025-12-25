@@ -57,15 +57,15 @@ const McpToolPage: React.FC = () => {
   // Fetch all servers to find parent server
   const [servers, serversLoaded] = useCatalogEntities<CatalogMcpServer>(
     CATALOG_MCP_SERVER_KIND,
-    undefined,
-    namespace
+    'mcp-server',  // ✅ Specify type to use MCP Entity API /servers endpoint
+    undefined       // Don't filter by namespace - fetch from all namespaces
   );
 
   // Fetch all workloads to find ones that use this tool
   const [workloads, workloadsLoaded] = useCatalogEntities<CatalogMcpWorkload>(
     CATALOG_MCP_WORKLOAD_KIND,
-    undefined,
-    namespace
+    'mcp-workload',  // ✅ Specify type to use MCP Entity API /workloads endpoint
+    undefined        // Don't filter by namespace - fetch from all namespaces
   );
 
   React.useEffect(() => {
