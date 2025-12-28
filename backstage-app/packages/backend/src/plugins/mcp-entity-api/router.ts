@@ -95,8 +95,7 @@ import {
   toMCPApiError,
 } from './errors';
 import { MCPEntityService } from './service';
-import { validator } from './validation';
-import { createRBACMiddlewareFactory } from './auth';
+import { createRBACMiddlewareFactory, extractOCPToken } from './auth';
 import type { MCPEntityApiConfig, EntityListParams } from './types';
 
 export interface RouterOptions {
@@ -186,6 +185,94 @@ export async function createRouter(
   });
 
   // ==========================================================================
+  // Catalog API Proxy Endpoint - /catalog-proxy/* (Option 3)
+  // ==========================================================================
+  // Proxies requests to Backstage catalog API with proper authentication handling.
+  // This allows the frontend to use a single proxy endpoint that handles both
+  // catalog API (read) and MCP Entity API (write) calls with consistent auth.
+  //
+  // Frontend usage: /api/mcp-entity-api/catalog-proxy/entities?filter=...
+  // Backend forwards to: /api/catalog/entities?filter=...
+  
+  // Manual proxy to Backstage Catalog API
+  // This endpoint forwards requests from the frontend to the catalog API with proper authentication
+  router.all('/catalog-proxy/*', asyncHandler(async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    
+    // Extract the path after /catalog-proxy/
+    const catalogPath = req.url.replace(/^\/catalog-proxy/, '');
+    const catalogUrl = `http://localhost:7007/api/catalog${catalogPath}`;
+    
+    // Extract token from request
+    const token = extractOCPToken(req);
+    
+    logger.info('Catalog proxy: Request received', {
+      method: req.method,
+      originalUrl: req.url,
+      catalogUrl,
+      hasAuthHeader: !!req.headers.authorization,
+      hasForwardedToken: !!req.headers['x-forwarded-access-token'],
+      tokenExtracted: !!token,
+    });
+    
+    // Prepare headers for catalog API request
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+    
+    // Forward auth token if available
+    // Note: Catalog API has dangerouslyDisableDefaultAuthPolicy: true, so it accepts
+    // requests without authentication, but we forward the token for consistency
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      logger.debug('Catalog proxy: Forwarding token to catalog API');
+    } else {
+      logger.debug('Catalog proxy: No token found, forwarding without auth');
+    }
+    
+    try {
+      // Forward the request to catalog API
+      const catalogResponse = await fetch(catalogUrl, {
+        method: req.method,
+        headers,
+        body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
+      });
+      
+      const duration = Date.now() - startTime;
+      
+      logger.info('Catalog proxy: Response received', {
+        method: req.method,
+        path: req.url,
+        statusCode: catalogResponse.status,
+        duration: `${duration}ms`,
+      });
+      
+      // Forward the catalog API response to the client
+      const data = await catalogResponse.json();
+      res.status(catalogResponse.status).json(data);
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      logger.error('Catalog proxy: Error forwarding request', {
+        method: req.method,
+        path: req.url,
+        error: errorMessage,
+        duration: `${duration}ms`,
+      });
+      
+      res.status(502).json({
+        error: {
+          name: 'BadGateway',
+          message: `Failed to forward request to catalog API: ${errorMessage}`,
+        },
+      });
+    }
+  }));
+
+  // ==========================================================================
   // Server Endpoints - /servers (T019-T022)
   // ==========================================================================
 
@@ -258,11 +345,11 @@ export async function createRouter(
    */
   // POST /servers - Create an MCP Server (T019, T038)
   // Requires mcp-admin role per FR-005
+  // Note: Validation handled by Backstage catalog when entity is saved
   router.post(
     '/servers',
     rbac('mcp-server', 'create'),
     asyncHandler(async (req, res) => {
-      validator.validateServer(req.body);
       const result = await service.createServer(req.body);
       sendCreatedResponse(res, result);
     }),
@@ -305,12 +392,12 @@ export async function createRouter(
 
   // PUT /servers/:namespace/:name - Update a server (T021, T038)
   // Requires mcp-admin role per FR-005
+  // Note: Validation handled by Backstage catalog when entity is saved
   router.put(
     '/servers/:namespace/:name',
     rbac('mcp-server', 'update'),
     asyncHandler(async (req, res) => {
       const { namespace, name } = req.params;
-      validator.validateServer(req.body);
       const result = await service.updateServer(namespace, name, req.body);
       sendSuccessResponse(res, result);
     }),
@@ -377,11 +464,11 @@ export async function createRouter(
 
   // POST /tools - Create an MCP Tool (T023, T039)
   // Requires mcp-admin role per FR-005
+  // Note: Validation handled by Backstage catalog when entity is saved
   router.post(
     '/tools',
     rbac('mcp-tool', 'create'),
     asyncHandler(async (req, res) => {
-      validator.validateTool(req.body);
       const result = await service.createTool(req.body);
       sendCreatedResponse(res, result);
     }),
@@ -400,12 +487,12 @@ export async function createRouter(
 
   // PUT /tools/:namespace/:name - Update a tool (T025, T039)
   // Requires mcp-admin role per FR-005
+  // Note: Validation handled by Backstage catalog when entity is saved
   router.put(
     '/tools/:namespace/:name',
     rbac('mcp-tool', 'update'),
     asyncHandler(async (req, res) => {
       const { namespace, name } = req.params;
-      validator.validateTool(req.body);
       const result = await service.updateTool(namespace, name, req.body);
       sendSuccessResponse(res, result);
     }),
@@ -442,11 +529,11 @@ export async function createRouter(
 
   // POST /workloads - Create an MCP Workload (T027, T040)
   // Requires mcp-user role per FR-005
+  // Note: Validation handled by Backstage catalog when entity is saved
   router.post(
     '/workloads',
     rbac('mcp-workload', 'create'),
     asyncHandler(async (req, res) => {
-      validator.validateWorkload(req.body);
       const result = await service.createWorkload(req.body);
       sendCreatedResponse(res, result);
     }),
@@ -465,12 +552,12 @@ export async function createRouter(
 
   // PUT /workloads/:namespace/:name - Update a workload (T029, T040)
   // Requires mcp-user role per FR-005
+  // Note: Validation handled by Backstage catalog when entity is saved
   router.put(
     '/workloads/:namespace/:name',
     rbac('mcp-workload', 'update'),
     asyncHandler(async (req, res) => {
       const { namespace, name } = req.params;
-      validator.validateWorkload(req.body);
       const result = await service.updateWorkload(namespace, name, req.body);
       sendSuccessResponse(res, result);
     }),
@@ -485,6 +572,55 @@ export async function createRouter(
       const { namespace, name } = req.params;
       await service.deleteWorkload(namespace, name);
       sendNoContentResponse(res);
+    }),
+  );
+
+  // ==========================================================================
+  // Admin Endpoints - /admin/* (Development/Testing)
+  // ==========================================================================
+  // These endpoints are for developers with admin access to manage soft-deleted
+  // workloads during testing. No production RBAC required (assumes admin access).
+
+  /**
+   * GET /admin/soft-deleted-workloads
+   * List all soft-deleted workloads
+   */
+  router.get(
+    '/admin/soft-deleted-workloads',
+    asyncHandler(async (_req, res) => {
+      const result = await service.listSoftDeletedWorkloads();
+      sendSuccessResponse(res, result);
+    }),
+  );
+
+  /**
+   * DELETE /admin/soft-deleted-workloads/:namespace/:name?mode=undelete|hard-delete
+   * Manage soft-deleted workloads:
+   * - mode=undelete: Remove soft-delete flags (restore workload to UI)
+   * - mode=hard-delete: Completely remove from database (allows creating new workload with same name)
+   */
+  router.delete(
+    '/admin/soft-deleted-workloads/:namespace/:name',
+    asyncHandler(async (req, res) => {
+      const { namespace, name } = req.params;
+      const mode = req.query.mode as string;
+
+      if (mode === 'undelete') {
+        await service.undeleteWorkload(namespace, name);
+        sendSuccessResponse(res, { 
+          message: `Workload component:${namespace}/${name} has been undeleted (soft-delete flags removed)` 
+        });
+      } else if (mode === 'hard-delete') {
+        await service.hardDeleteWorkload(namespace, name);
+        sendSuccessResponse(res, { 
+          message: `Workload component:${namespace}/${name} has been hard deleted from database` 
+        });
+      } else {
+        res.status(400).json({
+          error: 'BadRequest',
+          message: 'Query parameter "mode" must be either "undelete" or "hard-delete"',
+        });
+      }
     }),
   );
 

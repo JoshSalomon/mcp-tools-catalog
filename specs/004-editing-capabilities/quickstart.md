@@ -132,10 +132,8 @@ This guide walks through the editing capabilities added to the MCP Tools Catalog
 4. **Save Changes**
    - Click **Save** to update the workload
    - Form validates required fields
-   - If conflict detected (another user modified the workload):
-     - Conflict dialog appears
-     - Choose to **Overwrite** (proceed with your changes) or **Cancel** (abort save)
-   - If no conflict, workload is updated
+   - **Note**: Conflict detection is currently deferred (T034/T035). Current behavior is last-write-wins (later save overwrites earlier save). Conflict dialog component exists but is not yet integrated.
+   - Workload is updated
    - You are returned to the workloads list
    - Updated workload reflects your changes
 
@@ -235,17 +233,21 @@ Name field: "Name is required" (red text)
 Namespace field: "Namespace cannot be empty" (red text)
 ```
 
-### Conflict Detection
+### Conflict Detection (DEFERRED)
 
-**Scenario**: Another user modifies workload while you're editing
+**Status**: This feature is currently deferred (T034/T035). Implementation planned for future release.
 
-**Behavior**:
+**Current Behavior**: Last-write-wins (later save overwrites earlier save without warning)
+
+**Planned Behavior** (when implemented):
 - Conflict warning dialog appears when you click Save
 - Dialog shows:
   - "This workload was modified by another user"
   - Options: **Overwrite** (proceed) or **Cancel** (abort)
 - If you choose Overwrite, your changes replace theirs
 - If you choose Cancel, no changes are saved
+
+**Note**: ConflictDialog component exists and is functional, but conflict detection logic (timestamp comparison) is not yet integrated.
 
 ### Network Errors
 

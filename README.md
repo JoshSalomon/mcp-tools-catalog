@@ -49,6 +49,16 @@ The MCP Tools Catalog extends Backstage with three new entity types to provide c
 - **Workload → Tool**: `spec.dependsOn` creates `dependsOn`/`dependencyOf` relations
 - All entities are standard Backstage `Component` kind with custom `spec.type` values
 
+## 📚 Documentation
+
+**[Complete Documentation Index](DOCUMENTATION-INDEX.md)** - All documentation organized by topic and audience
+
+**Quick Links**:
+- 🏗️ [MERGE-ARCHITECTURE.md](MERGE-ARCHITECTURE.md) - How catalog + database merge works
+- ✅ [DISABLE-TOOLS-FIX-COMPLETE.md](DISABLE-TOOLS-FIX-COMPLETE.md) - Disable/enable tools feature
+- 🔐 [AUTHENTICATION.md](AUTHENTICATION.md) - Complete auth guide
+- 🚀 [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment guide
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -216,6 +226,12 @@ yarn lint
 > These steps are validated against a vanilla OpenShift Container Platform cluster with upstream Backstage distributions. If you enable any Red Hat Developer Hub–specific features, document a fallback that keeps the plugin functional on vanilla clusters.
 
 > **Deploying Backstage itself?** See the comprehensive [Deployment Guide (DEPLOYMENT.md)](DEPLOYMENT.md#-deploying-upstream-backstage-on-openshift) for instructions on deploying upstream Backstage to OpenShift, including the required Dockerfile patches for OpenShift's Security Context Constraints.
+>
+> **Authentication & Authorization?** See the [Authentication Guide (AUTHENTICATION.md)](AUTHENTICATION.md) for detailed information about the authentication flow, CSRF protection, nginx header forwarding, and troubleshooting authentication issues.
+>
+> **Entity Validation**: The MCP Entity API relies on Backstage's catalog validation (permissive, allows additional properties). Custom strict validation was removed to keep Backstage vanilla. See [VALIDATION-APPROACH.md](VALIDATION-APPROACH.md) for details and [AUTHENTICATION-FIX-SUMMARY.md](AUTHENTICATION-FIX-SUMMARY.md#design-decisions) for rationale.
+>
+> **YAML Entity Support**: The MCP Entity API supports entities loaded from YAML files via a merge approach: catalog provides entity definitions (source of truth), database stores runtime state (disabled flags), and the API layer merges them on GET. This allows runtime state to persist without modifying Backstage core. See [MERGE-ARCHITECTURE.md](MERGE-ARCHITECTURE.md) for architecture details and [YAML-ENTITY-FIX.md](YAML-ENTITY-FIX.md) for the fix history.
 
 ### One-Command Deployment (Recommended)
 
@@ -225,17 +241,32 @@ Use the unified build-push-deploy script for a complete deployment pipeline:
 # Full pipeline: build, push to registry, deploy to OpenShift, run sanity tests
 ./build-push-deploy-test.sh
 
-# Skip build (use existing image)
-./build-push-deploy-test.sh --skip-build
+# Target specific components:
+./build-push-deploy-test.sh --console-only   # Build/push/deploy console plugin only (default)
+./build-push-deploy-test.sh --backstage-only # Build/push/deploy backstage only
 
-# Build only (don't push or deploy)
-./build-push-deploy-test.sh --build-only
-
-# Skip sanity tests
-./build-push-deploy-test.sh --skip-tests
+# Common options:
+./build-push-deploy-test.sh --skip-build    # Skip build (use existing image)
+./build-push-deploy-test.sh --build-only    # Build only (don't push or deploy)
+./build-push-deploy-test.sh --skip-tests    # Skip sanity tests
+./build-push-deploy-test.sh --verbose       # Show detailed output
 ```
 
 **Configure your environment** by creating `.image-config.sh`:
+
+```bash
+IMAGE_REGISTRY="quay.io"
+IMAGE_ORG="your-org"
+CONSOLE_IMAGE_NAME="mcp-tools-catalog"
+BACKSTAGE_IMAGE_NAME="backstage"
+IMAGE_TAG="latest"
+OPENSHIFT_NAMESPACE="mcp-tools-catalog"
+DEPLOYMENT_NAME="mcp-catalog"
+BACKSTAGE_NAMESPACE="backstage"
+BACKSTAGE_DEPLOYMENT_NAME="backstage"
+```
+
+Or use environment variables:
 ```bash
 IMAGE_REGISTRY="quay.io"
 IMAGE_ORG="your-org"

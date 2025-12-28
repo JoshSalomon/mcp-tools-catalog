@@ -41,7 +41,11 @@ plugin:
     namespace: backstage
     port: 7443
     basePath: /
-    authorization: None
+    # Option 3: UserToken forwards token to MCP Entity API, which includes the catalog-proxy endpoint
+    # The catalog-proxy endpoint handles forwarding requests to Backstage catalog API with proper auth
+    # IMPORTANT: UserToken ensures the console proxy forwards X-Forwarded-Access-Token header
+    # which is required for both catalog-proxy (read) and MCP Entity API (write) endpoints
+    authorization: UserToken  # Forward user's authentication token to backend (required for catalog-proxy and MCP Entity API)
 
   proxies: []
 

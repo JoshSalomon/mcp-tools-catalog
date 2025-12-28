@@ -108,15 +108,15 @@
 - [X] T031 [US3] Implement pre-selection of tools currently in workload in WorkloadForm tree view in src/components/WorkloadForm.tsx
 - [X] T032 [US3] Implement change detection to enable Save/Cancel buttons when form data changes in useWorkloadForm hook in src/hooks/useWorkloadForm.ts
 - [X] T033 [US3] Create ConflictDialog component for conflict resolution with overwrite/cancel options in src/components/ConflictDialog.tsx
-- [ ] T034 [US3] Implement conflict detection using metadata.lastModified timestamp comparison in WorkloadForm component in src/components/WorkloadForm.tsx
-- [ ] T035 [US3] Implement conflict dialog display when concurrent edit detected in WorkloadForm component in src/components/WorkloadForm.tsx
+- [ ] T034 [US3] **DEFERRED** - Implement conflict detection using metadata.lastModified timestamp comparison in WorkloadForm component in src/components/WorkloadForm.tsx (Edge case: concurrent edits - current last-write-wins is acceptable for PoC)
+- [ ] T035 [US3] **DEFERRED** - Implement conflict dialog display when concurrent edit detected in WorkloadForm component in src/components/WorkloadForm.tsx (Depends on T034)
 - [X] T036 [US3] Implement Save button handler to update workload via API with conflict check in WorkloadForm component in src/components/WorkloadForm.tsx
 - [X] T037 [US3] Implement overwrite option in ConflictDialog to proceed with save despite conflict in src/components/ConflictDialog.tsx
 - [X] T038 [US3] Implement cancel option in ConflictDialog to abort save operation in src/components/ConflictDialog.tsx
 - [X] T039 [US3] Add Edit menu item to workload row menu in WorkloadsTab component in src/components/WorkloadsTab.tsx
 - [X] T040 [US3] Implement navigation from Edit menu to WorkloadForm in edit mode in src/components/WorkloadsTab.tsx
 - [X] T041 [US3] Add permission check to disable/hide Edit menu item for users without mcp-user role in src/components/WorkloadsTab.tsx
-- [ ] T042 [US3] Handle disabled tools that were previously selected (auto-uncheck with warning message) in WorkloadForm component in src/components/WorkloadForm.tsx
+- [ ] T042 [US3] **DEFERRED** - Handle disabled tools that were previously selected (auto-uncheck with warning message) in WorkloadForm component in src/components/WorkloadForm.tsx (Edge case: admin disables tool after workload uses it - current grayed-out display is acceptable for PoC)
 
 **Checkpoint**: At this point, User Story 3 should be fully functional and testable independently. Users can edit existing workloads with conflict detection and resolution.
 
@@ -151,7 +151,7 @@
 - [X] T052 [P] Optimize server/tool tree rendering for large datasets (virtual scrolling or pagination if needed)
 - [X] T053 [P] Add empty state handling for servers with no tools in WorkloadForm tree view
 - [X] T054 [P] Verify all permission checks work correctly across all editing operations
-- [ ] T055 [P] Run quickstart.md validation to ensure all workflows work as documented
+- [ ] T055 [P] **IN PROGRESS** - Run quickstart.md validation to ensure all workflows work as documented (See T055-validation-results.md for code review and manual testing checklist)
 - [X] T056 [P] Code cleanup and refactoring for consistency across all new components
 - [X] T057 [P] Update component documentation and inline comments
 

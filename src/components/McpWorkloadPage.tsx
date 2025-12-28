@@ -60,7 +60,8 @@ const McpWorkloadPage: React.FC = () => {
     CATALOG_MCP_WORKLOAD_KIND,
     shouldFetch ? name : '__placeholder__',
     namespace,
-    location.search  // Full query string includes timestamp, forcing refetch when changed
+    location.search,  // Full query string includes timestamp, forcing refetch when changed
+    'workload'  // Explicitly fetch from workloads endpoint
   );
 
   // Fetch all tools for reference resolution and validation

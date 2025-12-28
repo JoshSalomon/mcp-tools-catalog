@@ -395,7 +395,8 @@ export const useCatalogEntity = <T extends Entity>(
   kind: string,
   name: string,
   namespace: string = 'default',
-  refreshTrigger?: string | number
+  refreshTrigger?: string | number,
+  entityType?: 'server' | 'tool' | 'workload'
 ): [T | null, boolean, Error | null] => {
   const [data, setData] = useState<T | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -420,23 +421,25 @@ export const useCatalogEntity = <T extends Entity>(
     
     const fetchData = async () => {
       try {
-        // Note: We need to know the entity type to determine the correct endpoint
-        // For now, we'll try servers first, then tools, then workloads
-        // This is not ideal but works since the hook doesn't receive type information
-        
-        // Try fetching from each endpoint until we find the entity
-        const endpoints = [
-          `${MCP_ENTITY_API_ENDPOINT}/servers/${namespace}/${name}`,
-          `${MCP_ENTITY_API_ENDPOINT}/tools/${namespace}/${name}`,
-          `${MCP_ENTITY_API_ENDPOINT}/workloads/${namespace}/${name}`,
-        ];
-        
         const headers: Record<string, string> = {
           'Accept': 'application/json',
         };
         
         let entity = null;
-        for (const endpoint of endpoints) {
+        
+        // If entityType is provided, fetch directly from the correct endpoint
+        if (entityType) {
+          let endpoint: string;
+          if (entityType === 'server') {
+            endpoint = `${MCP_ENTITY_API_ENDPOINT}/servers/${namespace}/${name}`;
+          } else if (entityType === 'tool') {
+            endpoint = `${MCP_ENTITY_API_ENDPOINT}/tools/${namespace}/${name}`;
+          } else if (entityType === 'workload') {
+            endpoint = `${MCP_ENTITY_API_ENDPOINT}/workloads/${namespace}/${name}`;
+          } else {
+            throw new Error(`Unknown entity type: ${entityType}`);
+          }
+          
           const url = new URL(endpoint, window.location.origin);
           const response = await fetch(url.toString(), {
             headers,
@@ -445,24 +448,54 @@ export const useCatalogEntity = <T extends Entity>(
 
           if (response.ok) {
             entity = await response.json();
-            break;
-          } else if (response.status !== 404) {
+          } else if (response.status === 404) {
+            // Entity not found, return null
+            if (mounted) {
+              setData(null);
+              setLoaded(true);
+            }
+            return;
+          } else {
             // Non-404 error, throw
             throw new Error(`Failed to fetch entity: ${response.statusText} (${response.status})`);
           }
-          // If 404, try next endpoint
-        }
+        } else {
+          // Fallback: try all endpoints (for backward compatibility)
+          // This handles cases where caller doesn't know the entity type
+          const endpoints = [
+            `${MCP_ENTITY_API_ENDPOINT}/servers/${namespace}/${name}`,
+            `${MCP_ENTITY_API_ENDPOINT}/tools/${namespace}/${name}`,
+            `${MCP_ENTITY_API_ENDPOINT}/workloads/${namespace}/${name}`,
+          ];
+          
+          for (const endpoint of endpoints) {
+            const url = new URL(endpoint, window.location.origin);
+            const response = await fetch(url.toString(), {
+              headers,
+              credentials: 'include',
+            });
 
-        if (!entity) {
-          // Entity not found in any endpoint
-          if (mounted) {
-            setData(null);
-            setLoaded(true);
+            if (response.ok) {
+              entity = await response.json();
+              break;
+            } else if (response.status !== 404) {
+              // Non-404 error, throw
+              throw new Error(`Failed to fetch entity: ${response.statusText} (${response.status})`);
+            }
+            // If 404, try next endpoint
           }
-          return;
+
+          if (!entity) {
+            // Entity not found in any endpoint
+            if (mounted) {
+              setData(null);
+              setLoaded(true);
+            }
+            return;
+          }
         }
         
-        if (mounted) {
+        if (mounted && entity) {
           setData(entity as T);
           setLoaded(true);
         }
@@ -480,7 +513,7 @@ export const useCatalogEntity = <T extends Entity>(
     return () => {
       mounted = false;
     };
-  }, [kind, name, namespace, refreshTrigger]);
+  }, [kind, name, namespace, refreshTrigger, entityType]);
 
   return [data, loaded, error];
 };

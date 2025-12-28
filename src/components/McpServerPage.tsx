@@ -59,7 +59,8 @@ const McpServerPage: React.FC = () => {
     CATALOG_MCP_SERVER_KIND, 
     shouldFetch ? name : '__placeholder__', 
     namespace,
-    location.key  // Simple cache key
+    location.key,  // Simple cache key
+    'server'  // Explicitly fetch from servers endpoint
   );
 
   // Fetch all tools to find ones provided by this server

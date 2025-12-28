@@ -1,0 +1,13 @@
+# Remove mcp-user role from dev user
+# This file removes the dev user from any mcp-user bindings
+# 
+# If there's a specific binding like mcp-user-dev, delete it:
+#   oc delete clusterrolebinding mcp-user-dev
+#
+# If dev is in a group binding (like mcp-users with system:authenticated),
+# you'll need to modify that binding to exclude dev, or create a separate
+# binding that explicitly denies dev (not supported in standard RBAC).
+#
+# The easiest approach is to create a more specific binding that overrides
+# the group binding. Since RBAC uses "most permissive" logic, we can't
+# directly revoke permissions. Instead, we ensure dev only has mcp-viewer.

@@ -498,6 +498,8 @@ export class MCPEntityService {
   /**
    * Get a single MCP Workload by namespace and name
    * Merges catalog entity (source of truth) with database state (runtime overrides)
+   * If entity doesn't exist in catalog yet (newly created via API), returns database entity
+   * Returns 404 for soft-deleted workloads
    */
   async getWorkload(namespace: string, name: string): Promise<MCPWorkloadEntity> {
     const entityRef = buildEntityRef('component', namespace, name);
@@ -512,7 +514,29 @@ export class MCPEntityService {
     // Check for mcp-workload or compatible types (service, workflow)
     const entityType = (catalogEntity?.spec as any)?.type;
     const validTypes = ['mcp-workload', 'service', 'workflow'];
+    
+    // If not found in catalog, check if it exists in database only (newly created via API)
     if (!catalogEntity || !validTypes.includes(entityType)) {
+      const dbEntity = await this.database.getEntity(entityRef);
+      if (dbEntity) {
+        // Entity exists in database but not yet propagated to catalog
+        // This is expected for newly created entities via API
+        const dbEntityType = (dbEntity.spec as any)?.type;
+        if (validTypes.includes(dbEntityType)) {
+          // Check if soft-deleted
+          const annotations = dbEntity.metadata.annotations || {};
+          if (annotations['mcp-catalog.io/deleted'] === 'true') {
+            throw new NotFoundError(entityRef);  // Treat soft-deleted as not found
+          }
+          
+          this.logger.debug('Returning database-only workload (not yet in catalog)', { 
+            entityRef,
+            type: dbEntityType
+          });
+          return dbEntity as unknown as MCPWorkloadEntity;
+        }
+      }
+      // Entity doesn't exist in catalog or database
       throw new NotFoundError(entityRef);
     }
 
@@ -521,7 +545,7 @@ export class MCPEntityService {
     
     // Merge: catalog as base, database fields overlay
     if (dbEntity) {
-      return {
+      const merged = {
         ...catalogEntity,
         metadata: {
           ...catalogEntity.metadata,
@@ -541,6 +565,14 @@ export class MCPEntityService {
           ...('dependsOn' in (dbEntity.spec || {}) && { dependsOn: (dbEntity.spec as any).dependsOn }),
         },
       } as unknown as MCPWorkloadEntity;
+      
+      // Check if soft-deleted
+      const annotations = merged.metadata.annotations || {};
+      if (annotations['mcp-catalog.io/deleted'] === 'true') {
+        throw new NotFoundError(entityRef);  // Treat soft-deleted as not found
+      }
+      
+      return merged;
     }
 
     return catalogEntity as unknown as MCPWorkloadEntity;
@@ -549,6 +581,7 @@ export class MCPEntityService {
   /**
    * List all MCP Workloads with optional filtering
    * Merges catalog entities with database state (runtime overrides)
+   * Includes database-only entities (newly created via API, not yet in catalog)
    */
   async listWorkloads(params?: EntityListParams): Promise<EntityListResponse<MCPWorkloadEntity>> {
     // Query for all workload types: mcp-workload, service, workflow
@@ -576,7 +609,7 @@ export class MCPEntityService {
         const dbEntity = await this.database.getEntity(entityRef);
         
         if (dbEntity) {
-          return {
+          const merged = {
             ...catalogEntity,
             metadata: {
               ...catalogEntity.metadata,
@@ -596,19 +629,66 @@ export class MCPEntityService {
               ...('dependsOn' in (dbEntity.spec || {}) && { dependsOn: (dbEntity.spec as any).dependsOn }),
             },
           };
+          
+          // Filter out soft-deleted entities
+          const annotations = merged.metadata.annotations || {};
+          if (annotations['mcp-catalog.io/deleted'] === 'true') {
+            return null;  // Exclude soft-deleted workloads
+          }
+          
+          return merged;
         }
         return catalogEntity;
       }),
     );
 
+    // Filter out nulls (soft-deleted entities)
+    const filteredMergedEntities = mergedEntities.filter(e => e !== null);
+
+    // Also include database-only entities (newly created via API, not yet in catalog)
+    const catalogEntityRefs = new Set(
+      catalogEntities.map(e => 
+        buildEntityRef('component', e.metadata.namespace || 'default', e.metadata.name)
+      )
+    );
+    
+    const allDbEntities = await this.database.listEntities();
+    const validTypes = ['mcp-workload', 'service', 'workflow'];
+    const dbOnlyWorkloads = allDbEntities
+      .filter(dbEntity => {
+        const entityRef = buildEntityRef(
+          'component',
+          dbEntity.metadata.namespace || 'default',
+          dbEntity.metadata.name
+        );
+        const dbEntityType = (dbEntity.spec as any)?.type;
+        const annotations = dbEntity.metadata.annotations || {};
+        
+        // Include if: not in catalog, is a workload type, matches namespace filter (if any), and not soft-deleted
+        return !catalogEntityRefs.has(entityRef) &&
+               validTypes.includes(dbEntityType) &&
+               (!params?.namespace || dbEntity.metadata.namespace === params.namespace) &&
+               annotations['mcp-catalog.io/deleted'] !== 'true';  // Exclude soft-deleted
+      });
+
+    if (dbOnlyWorkloads.length > 0) {
+      this.logger.debug('Including database-only workloads in list', {
+        count: dbOnlyWorkloads.length,
+        workloads: dbOnlyWorkloads.map(e => e.metadata.name)
+      });
+    }
+
+    const allEntities = [...filteredMergedEntities, ...dbOnlyWorkloads];
+
     return {
-      items: mergedEntities as unknown as MCPWorkloadEntity[],
-      totalCount: mergedEntities.length,
+      items: allEntities as unknown as MCPWorkloadEntity[],
+      totalCount: allEntities.length,
     };
   }
 
   /**
    * Update an existing MCP Workload
+   * Supports both YAML-defined and API-created (database-only) workloads
    */
   async updateWorkload(
     namespace: string,
@@ -617,27 +697,70 @@ export class MCPEntityService {
   ): Promise<MCPWorkloadEntity> {
     this.logger.info('Updating MCP Workload', { namespace, name });
 
-    // Note: Validation handled by Backstage catalog when entity is saved
     const entityRef = buildEntityRef('component', namespace, name);
+    const validTypes = ['mcp-workload', 'service', 'workflow'];
     
-    // Verify entity exists in catalog (checks both YAML and API-created entities)
-    const existing = await this.catalog.getEntityByRef({
+    // Try to get entity from catalog (YAML-defined workloads)
+    const catalogEntity = await this.catalog.getEntityByRef({
       kind: 'Component',
       namespace,
       name,
     });
-    const entityType = (existing?.spec as any)?.type;
-    const validTypes = ['mcp-workload', 'service', 'workflow'];
-    if (!existing || !validTypes.includes(entityType)) {
+    
+    const catalogEntityType = (catalogEntity?.spec as any)?.type;
+    
+    // If not found in catalog or wrong type, check database (API-created workloads)
+    if (!catalogEntity || !validTypes.includes(catalogEntityType)) {
+      const dbEntity = await this.database.getEntity(entityRef);
+      if (dbEntity) {
+        const dbEntityType = (dbEntity.spec as any)?.type;
+        if (validTypes.includes(dbEntityType)) {
+          // Database-only entity - update it
+          this.logger.debug('Updating database-only workload', { entityRef });
+          
+          // Merge input with existing database entity
+          const updatedEntity: MCPWorkloadEntity = {
+            apiVersion: dbEntity.apiVersion || 'backstage.io/v1alpha1',
+            kind: dbEntity.kind || 'Component',
+            metadata: {
+              ...dbEntity.metadata,
+              name: name,
+              namespace: namespace || 'default',
+              // Only update fields that are provided in input
+              ...(input.metadata?.description !== undefined && { description: input.metadata.description }),
+              ...(input.metadata?.title !== undefined && { title: input.metadata.title }),
+              ...(input.metadata?.labels !== undefined && { labels: input.metadata.labels }),
+              ...(input.metadata?.annotations !== undefined && { annotations: input.metadata.annotations }),
+              ...(input.metadata?.tags !== undefined && { tags: input.metadata.tags }),
+            },
+            spec: {
+              ...(dbEntity.spec as any),
+              // Only update fields that are provided in input
+              ...(input.spec?.type !== undefined && { type: input.spec.type }),
+              ...(input.spec?.lifecycle !== undefined && { lifecycle: input.spec.lifecycle }),
+              ...(input.spec?.owner !== undefined && { owner: input.spec.owner }),
+              ...(input.spec?.dependsOn !== undefined && { dependsOn: input.spec.dependsOn }),
+              ...(input.spec?.mcp !== undefined && { mcp: input.spec.mcp }),
+            },
+            ...(dbEntity.relations && { relations: dbEntity.relations }),
+          };
+
+          await this.database.upsertEntity(updatedEntity);
+          await this.entityProvider.updateEntity(updatedEntity);
+          
+          return updatedEntity;
+        }
+      }
+      // Entity doesn't exist in catalog or database
       throw new NotFoundError(entityRef);
     }
 
-    // Merge input with existing entity to preserve fields not being updated
+    // YAML-defined workload - merge input and save to database as override
     const entity: MCPWorkloadEntity = {
-      apiVersion: existing.apiVersion || 'backstage.io/v1alpha1',
-      kind: existing.kind || 'Component',
+      apiVersion: catalogEntity.apiVersion || 'backstage.io/v1alpha1',
+      kind: catalogEntity.kind || 'Component',
       metadata: {
-        ...existing.metadata,
+        ...catalogEntity.metadata,
         name: name,
         namespace: namespace || 'default',
         // Only update fields that are provided in input
@@ -648,7 +771,7 @@ export class MCPEntityService {
         ...(input.metadata?.tags !== undefined && { tags: input.metadata.tags }),
       },
       spec: {
-        ...(existing.spec as any),
+        ...(catalogEntity.spec as any),
         // Only update fields that are provided in input
         ...(input.spec?.type !== undefined && { type: input.spec.type }),
         ...(input.spec?.lifecycle !== undefined && { lifecycle: input.spec.lifecycle }),
@@ -656,7 +779,7 @@ export class MCPEntityService {
         ...(input.spec?.dependsOn !== undefined && { dependsOn: input.spec.dependsOn }),
         ...(input.spec?.mcp !== undefined && { mcp: input.spec.mcp }),
       },
-      ...(existing.relations && { relations: existing.relations }),
+      ...(catalogEntity.relations && { relations: catalogEntity.relations }),
     };
 
     await this.database.upsertEntity(entity);
@@ -669,30 +792,157 @@ export class MCPEntityService {
 
   /**
    * Delete an MCP Workload (orphan behavior - FR-008)
+   * Supports both YAML-defined and API-created (database-only) workloads
+   * YAML-defined workloads are soft-deleted (marked as deleted) to prevent re-ingestion
    */
   async deleteWorkload(namespace: string, name: string): Promise<void> {
     this.logger.info('Deleting MCP Workload', { namespace, name });
 
     const entityRef = buildEntityRef('component', namespace, name);
+    const validTypes = ['mcp-workload', 'service', 'workflow'];
     
-    // Verify entity exists in catalog (checks both YAML and API-created entities)
-    const existing = await this.catalog.getEntityByRef({
+    // Try to get entity from catalog (YAML-defined workloads)
+    const catalogEntity = await this.catalog.getEntityByRef({
       kind: 'Component',
       namespace,
       name,
     });
-    const entityType = (existing?.spec as any)?.type;
-    const validTypes = ['mcp-workload', 'service', 'workflow'];
-    if (!existing || !validTypes.includes(entityType)) {
+    const catalogEntityType = (catalogEntity?.spec as any)?.type;
+    
+    // If not found in catalog or wrong type, check database (API-created workloads)
+    if (!catalogEntity || !validTypes.includes(catalogEntityType)) {
+      const dbEntity = await this.database.getEntity(entityRef);
+      if (dbEntity) {
+        const dbEntityType = (dbEntity.spec as any)?.type;
+        if (validTypes.includes(dbEntityType)) {
+          // Database-only entity - hard delete
+          this.logger.debug('Hard deleting database-only workload', { entityRef });
+          await this.database.deleteEntity(entityRef);
+          await this.entityProvider.removeEntity(entityRef);
+          this.logger.info('Workload deleted', { entityRef });
+          return;
+        }
+      }
+      // Entity doesn't exist in catalog or database
       throw new NotFoundError(entityRef);
     }
 
+    // YAML-defined workload - check if managed by location (GitHub, etc.)
+    const managedByLocation = catalogEntity.metadata.annotations?.['backstage.io/managed-by-location'];
+    
+    if (managedByLocation) {
+      // Soft delete: mark as deleted in database to prevent re-appearance
+      this.logger.info('Soft deleting YAML-managed workload', { 
+        entityRef, 
+        managedByLocation 
+      });
+      
+      const softDeletedEntity = {
+        ...catalogEntity,
+        metadata: {
+          ...catalogEntity.metadata,
+          annotations: {
+            ...catalogEntity.metadata.annotations,
+            'mcp-catalog.io/deleted': 'true',
+            'mcp-catalog.io/deleted-at': new Date().toISOString(),
+          },
+        },
+      };
+      
+      await this.database.upsertEntity(softDeletedEntity);
+      this.logger.info('Workload soft-deleted (marked as deleted, hidden from UI)', { entityRef });
+    } else {
+      // Not managed by location - hard delete (API-created without location)
+      this.logger.info('Hard deleting non-location-managed workload', { entityRef });
+      await this.database.deleteEntity(entityRef);
+      await this.entityProvider.removeEntity(entityRef);
+      this.logger.info('Workload deleted', { entityRef });
+    }
+  }
+
+  // ===========================================================================
+  // Admin Endpoints - For development/testing
+  // ===========================================================================
+
+  /**
+   * List all soft-deleted workloads (admin only)
+   */
+  async listSoftDeletedWorkloads(): Promise<Array<{ entityRef: string; name: string; namespace: string; deletedAt: string }>> {
+    this.logger.info('Listing soft-deleted workloads (admin)');
+    
+    const allDbEntities = await this.database.listEntities();
+    const softDeleted = allDbEntities
+      .filter(entity => {
+        const annotations = entity.metadata.annotations || {};
+        return annotations['mcp-catalog.io/deleted'] === 'true';
+      })
+      .map(entity => ({
+        entityRef: buildEntityRef('component', entity.metadata.namespace || 'default', entity.metadata.name),
+        name: entity.metadata.name,
+        namespace: entity.metadata.namespace || 'default',
+        deletedAt: entity.metadata.annotations?.['mcp-catalog.io/deleted-at'] || 'unknown',
+      }));
+    
+    this.logger.info('Found soft-deleted workloads', { count: softDeleted.length });
+    return softDeleted;
+  }
+
+  /**
+   * Undelete a soft-deleted workload (admin only)
+   * Removes the soft-delete flags from the database
+   */
+  async undeleteWorkload(namespace: string, name: string): Promise<void> {
+    this.logger.info('Undeleting soft-deleted workload (admin)', { namespace, name });
+    
+    const entityRef = buildEntityRef('component', namespace, name);
+    const dbEntity = await this.database.getEntity(entityRef);
+    
+    if (!dbEntity) {
+      throw new NotFoundError(entityRef);
+    }
+    
+    const annotations = dbEntity.metadata.annotations || {};
+    if (annotations['mcp-catalog.io/deleted'] !== 'true') {
+      throw new Error(`Entity ${entityRef} is not soft-deleted`);
+    }
+    
+    // Remove soft-delete flags
+    const updatedEntity = {
+      ...dbEntity,
+      metadata: {
+        ...dbEntity.metadata,
+        annotations: {
+          ...annotations,
+        },
+      },
+    };
+    
+    delete updatedEntity.metadata.annotations!['mcp-catalog.io/deleted'];
+    delete updatedEntity.metadata.annotations!['mcp-catalog.io/deleted-at'];
+    
+    await this.database.upsertEntity(updatedEntity);
+    this.logger.info('Workload undeleted (soft-delete flags removed)', { entityRef });
+  }
+
+  /**
+   * Hard delete a workload from database (admin only)
+   * Completely removes the database record, allowing recreation with same name
+   */
+  async hardDeleteWorkload(namespace: string, name: string): Promise<void> {
+    this.logger.info('Hard deleting workload from database (admin)', { namespace, name });
+    
+    const entityRef = buildEntityRef('component', namespace, name);
+    const dbEntity = await this.database.getEntity(entityRef);
+    
+    if (!dbEntity) {
+      throw new NotFoundError(`Entity ${entityRef} not found in database`);
+    }
+    
+    // Delete from database and entity provider
     await this.database.deleteEntity(entityRef);
-
-    // Remove entity from catalog immediately (delta mutation)
     await this.entityProvider.removeEntity(entityRef);
-
-    this.logger.info('Workload deleted', { entityRef });
+    
+    this.logger.info('Workload hard deleted from database', { entityRef });
   }
 
   // ===========================================================================
