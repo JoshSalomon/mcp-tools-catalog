@@ -1,0 +1,199 @@
+# Backstage Architecture Principles (Backend Only)
+
+## Applies To
+
+This rule applies **ONLY** to backend development in:
+- `backstage-app/packages/backend/`
+- Backstage plugin code
+- Database and catalog operations
+
+## Core Architecture: Backstage As-Is + Plugin Extension
+
+### Rule 1: Never Modify Backstage Core
+
+**YOU MUST NOT:**
+- ❌ Modify Backstage's core catalog system
+- ❌ Change Backstage's database schema
+- ❌ Override Backstage's entity provider mechanisms
+- ❌ Modify Backstage's API structure
+- ❌ Change how Backstage loads or processes catalog entities
+
+**YOU MUST:**
+- ✅ Use Backstage's extension points (plugins, entity providers)
+- ✅ Work within Backstage's plugin architecture
+- ✅ Leverage Backstage's existing APIs and services
+- ✅ Follow Backstage's patterns and conventions
+
+### Rule 2: Database as Source of Truth - Merge Architecture
+
+**The Database Architecture:**
+
+```
+Source of Truth = Backstage Catalog DB + Plugin DB (merged)
+
+┌─────────────────────────────────────────┐
+│ Backstage Catalog DB (YAML + API)      │  ← Base entity definitions
+│ - Loaded from YAML files               │  ← Read-only for YAML entities
+│ - Or created via Backstage API         │  ← Source of truth for structure
+└─────────────────────────────────────────┘
+                    +
+┌─────────────────────────────────────────┐
+│ Plugin DB (mcp-entities.db)            │  ← Runtime state & user edits
+│ - Tool disabled/enabled state          │  ← Overlay/augmentation
+│ - Workload edits (description, etc.)   │  ← User modifications
+│ - Entity annotations                   │  ← Dynamic properties
+└─────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────┐
+│ MERGED VIEW (returned to API clients)  │  ← Plugin DB wins on conflicts
+│ - Catalog entity as base               │
+│ - Plugin DB fields overlay/override    │
+└─────────────────────────────────────────┘
+```
+
+**The Merge Logic:**
+
+```typescript
+// CORRECT: Backstage catalog is base, plugin DB overlays
+async getEntity(namespace: string, name: string) {
+  // 1. Get entity from Backstage catalog (YAML source of truth)
+  const catalogEntity = await this.catalog.getEntityByRef({...});
+  
+  // 2. Get any database overrides (runtime state)
+  const dbEntity = await this.database.getEntity(entityRef);
+  
+  // 3. Merge: catalog as base, database fields win
+  if (dbEntity) {
+    return {
+      ...catalogEntity,
+      metadata: {
+        ...catalogEntity.metadata,
+        // Database wins for user-editable fields
+        ...(dbEntity.metadata.description && { description: dbEntity.metadata.description }),
+        annotations: {
+          ...catalogEntity.metadata.annotations,
+          ...dbEntity.metadata.annotations,  // Database wins
+        },
+      },
+      spec: {
+        ...catalogEntity.spec,
+        // Database wins for runtime/user-editable fields
+        ...dbEntity.spec,
+      },
+    };
+  }
+  
+  return catalogEntity;
+}
+```
+
+### Rule 3: Read vs Write Responsibilities
+
+**Backstage Catalog DB (Read Priority):**
+- Entity structure and relationships
+- YAML-defined entities
+- System-generated fields (uid, etag, etc.)
+
+**Plugin DB (Write Priority):**
+- User edits (description, lifecycle, owner, dependsOn)
+- Runtime state (disabled/enabled)
+- Dynamic annotations
+- Augmentation data
+
+**NEVER:**
+- ❌ Try to write to Backstage catalog DB directly
+- ❌ Bypass the EntityProvider for catalog updates
+- ❌ Store data that should be in Backstage in the plugin DB
+- ❌ Create a separate source of truth outside the merge architecture
+
+### Rule 4: Entity Provider Pattern
+
+**CORRECT pattern for updating Backstage catalog:**
+
+```typescript
+// Plugin provides entities to Backstage
+class MCPEntityProvider implements EntityProvider {
+  async connect(connection: EntityProviderConnection) {
+    // Backstage will call this to get entities
+  }
+  
+  // Provide updates via EntityProviderConnection
+  async updateEntity(entity: Entity) {
+    await this.connection.applyMutation({
+      type: 'full',
+      entities: [{ entity, locationKey: 'mcp-entity-provider' }],
+    });
+  }
+}
+
+// Then in service:
+async updateWorkload(namespace: string, name: string, input: WorkloadInput) {
+  // 1. Get existing from Backstage catalog
+  const existing = await this.catalog.getEntityByRef({...});
+  
+  // 2. Merge changes
+  const updated = { ...existing, ...input };
+  
+  // 3. Save to plugin DB
+  await this.database.upsertEntity(updated);
+  
+  // 4. Update Backstage catalog via EntityProvider
+  await this.entityProvider.updateEntity(updated);
+}
+```
+
+## Common Violations to Avoid
+
+### ❌ WRONG: Treating Plugin DB as Primary Source
+```typescript
+// DON'T DO THIS
+const entity = await this.database.getEntity(ref);
+return entity; // Missing catalog data!
+```
+
+### ✅ CORRECT: Merge Architecture
+```typescript
+// DO THIS
+const catalogEntity = await this.catalog.getEntityByRef({...});
+const dbEntity = await this.database.getEntity(ref);
+return mergeEntities(catalogEntity, dbEntity); // DB overlays catalog
+```
+
+### ❌ WRONG: Modifying Backstage Core
+```typescript
+// DON'T DO THIS
+await backstage.catalog.database.update(...); // Direct DB access
+```
+
+### ✅ CORRECT: Use EntityProvider
+```typescript
+// DO THIS
+await this.entityProvider.updateEntity(entity); // Backstage's way
+```
+
+## Rationale
+
+**Why Backstage As-Is:**
+- Backstage is a complex, well-tested platform
+- Core modifications break upgrades and support
+- Plugin architecture is designed for extensions
+
+**Why Merge Architecture:**
+- YAML files define entity structure (Git-tracked)
+- Plugin DB stores runtime state (ephemeral, user edits)
+- Merge gives best of both: declarative + dynamic
+- Database overlay preserves user edits without modifying YAML
+
+**Why Database is Source of Truth:**
+- Backstage catalog is the base source of truth (YAML + API)
+- Plugin DB augments with runtime state and user edits
+- Merge view combines both: catalog + overlay
+- No single source - it's a layered architecture
+
+## Key Principle
+
+> **Backstage catalog defines WHAT entities exist.**
+> **Plugin DB defines HOW they're configured/modified.**
+> **Merge architecture combines both into the source of truth.**
+
+This is NOT "database is source of truth" in the traditional sense - it's **"merged view is source of truth"** where Backstage catalog is the foundation and plugin DB provides the overlay.

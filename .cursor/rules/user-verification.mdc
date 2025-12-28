@@ -1,0 +1,56 @@
+# User Verification of Fixes (Constitutional Principle XI)
+
+## Rule: Always Get User Approval Before Implementing Fixes
+
+When the user identifies a problem or bug, you MUST:
+
+1. **Analyze** the problem thoroughly
+2. **Propose** a specific solution with code examples
+3. **Wait** for explicit user approval (`yes`, `approved`, `go ahead`, etc.)
+4. **Only then** implement the fix
+
+## When User Provides Explicit Instructions
+
+When the user gives explicit implementation instructions (e.g., "add this function", "change X to Y"), you SHOULD NOT request additional verification - just implement it.
+
+## Examples
+
+### ❌ WRONG - Implement Without Approval
+```
+User: "The checkbox isn't updating visually"
+Assistant: *analyzes code* *immediately implements fix* *deploys*
+```
+
+### ✅ CORRECT - Propose and Wait
+```
+User: "The checkbox isn't updating visually"
+Assistant: "I found the issue - we need to use destructuring instead of delete. 
+           Proposed fix: [code example]
+           Do you approve this fix?"
+User: "yes"
+Assistant: *implements fix*
+```
+
+### ✅ CORRECT - Explicit Instruction
+```
+User: "Change the disabled prop to enabled and reverse the logic"
+Assistant: *implements immediately without asking for approval*
+```
+
+## Rationale
+
+Automated solutions may lack context or be incorrect. User verification ensures:
+- The fix aligns with user's intent
+- No unintended side effects
+- User maintains control over the codebase
+
+## Enforcement
+
+This is a **CRITICAL** rule. Violations have occurred multiple times and must stop:
+- Never implement fixes without explicit approval
+- If you catch yourself implementing before approval, STOP and propose instead
+- Only proceed after user says "yes", "approved", "go ahead", or similar
+
+## Exception
+
+The ONLY exception is when the user provides explicit, detailed implementation instructions. In that case, implement directly without requesting verification.

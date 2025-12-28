@@ -110,6 +110,67 @@ export class MCPEntityProvider implements EntityProvider {
   }
 
   /**
+   * Update a specific entity in the catalog (delta mutation)
+   */
+  async updateEntity(entity: Entity): Promise<void> {
+    if (!this.connection) {
+      this.logger.warn('Cannot update entity: not connected to catalog');
+      return;
+    }
+
+    try {
+      this.logger.info('Updating entity in catalog', { 
+        name: entity.metadata.name,
+        namespace: entity.metadata.namespace 
+      });
+
+      // Apply delta mutation - adds/updates specific entity
+      await this.connection.applyMutation({
+        type: 'delta',
+        added: [{
+          entity: this.addProviderMetadata(entity),
+          locationKey: this.getProviderName(),
+        }],
+        removed: [],
+      });
+
+      this.logger.info('Entity updated in catalog successfully', { 
+        name: entity.metadata.name 
+      });
+    } catch (error) {
+      this.logger.error('Failed to update entity in catalog', { error });
+    }
+  }
+
+  /**
+   * Remove a specific entity from the catalog (delta mutation)
+   */
+  async removeEntity(entityRef: string): Promise<void> {
+    if (!this.connection) {
+      this.logger.warn('Cannot remove entity: not connected to catalog');
+      return;
+    }
+
+    try {
+      this.logger.info('Removing entity from catalog', { entityRef });
+
+      // Apply delta mutation - removes specific entity
+      await this.connection.applyMutation({
+        type: 'delta',
+        added: [],
+        removed: [{
+          entityRef,
+          locationKey: this.getProviderName(),
+        }],
+      });
+
+      this.logger.info('Entity removed from catalog successfully', { entityRef });
+    } catch (error) {
+      this.logger.error('Failed to remove entity from catalog', { error });
+    }
+  }
+
+  /**
    * Add provider metadata to entity
    */
   private addProviderMetadata(entity: Entity): Entity {

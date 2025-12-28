@@ -168,6 +168,266 @@ Backstage container (HTTP on port 7007)
 
 ---
 
+## 🔐 Authentication & Authorization Architecture
+
+### Authentication Flow
+
+The MCP Tools Catalog implements a multi-layered authentication flow for write operations:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      Authentication Flow                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. Browser                                                             │
+│     ├─ User session cookies (HttpOnly)                                 │
+│     ├─ csrf-token cookie                                               │
+│     └─ Sends requests with credentials: 'include'                      │
+│           │                                                             │
+│           ▼                                                             │
+│  2. OpenShift Console Proxy                                            │
+│     ├─ Extracts user token from HttpOnly cookie                        │
+│     ├─ Adds X-Forwarded-Access-Token header                            │
+│     ├─ Validates CSRF token (X-CSRFToken header vs csrf-token cookie)  │
+│     └─ Forwards to backend service                                     │
+│           │                                                             │
+│           ▼                                                             │
+│  3. nginx TLS Sidecar (port 7443)                                      │
+│     ├─ Terminates TLS                                                  │
+│     ├─ Forwards X-Forwarded-Access-Token header                        │
+│     ├─ Forwards Authorization header (if present)                      │
+│     └─ Proxies to Backstage (http://127.0.0.1:7007)                    │
+│           │                                                             │
+│           ▼                                                             │
+│  4. MCP Entity API (Backstage plugin)                                  │
+│     ├─ Extracts token from X-Forwarded-Access-Token or Authorization   │
+│     ├─ Validates token via OpenShift SubjectAccessReview API           │
+│     ├─ Checks MCP RBAC permissions (mcp-admin/mcp-user)                │
+│     └─ Allows or denies operation                                      │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Components
+
+#### 1. Frontend (Console Plugin)
+
+**Location**: `src/services/catalogService.ts`
+
+The frontend handles authentication tokens automatically:
+
+```typescript
+// CSRF Token Handling
+const createAuthHeaders = () => {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+  
+  // Extract CSRF token from cookie for write operations
+  const csrfToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrf-token='))
+    ?.split('=')[1];
+  
+  if (csrfToken) {
+    headers['X-CSRFToken'] = csrfToken;  // Required by OpenShift Console proxy
+  }
+  
+  return headers;
+};
+
+// All requests include credentials: 'include' to send cookies
+fetch(url, {
+  headers: createAuthHeaders(),
+  credentials: 'include',  // Send HttpOnly session cookies
+});
+```
+
+**Important**:
+- ✅ User authentication token is in an HttpOnly cookie (not accessible to JavaScript)
+- ✅ Console proxy automatically extracts it and adds `X-Forwarded-Access-Token` header
+- ✅ Frontend only needs to include CSRF token for write operations (PUT/POST/DELETE)
+- ❌ Frontend does NOT manually extract or send authentication tokens
+
+#### 2. OpenShift Console Proxy
+
+**Configuration**: `charts/openshift-console-plugin/values.yaml`
+
+```yaml
+plugin:
+  backstage:
+    enabled: true
+    serviceName: backstage
+    namespace: backstage
+    port: 7443  # HTTPS port with TLS sidecar
+    # UserToken: Console proxy forwards user's auth token as X-Forwarded-Access-Token
+    authorization: UserToken
+```
+
+**What it does**:
+1. Extracts user's authentication token from HttpOnly session cookie
+2. Adds `X-Forwarded-Access-Token: <token>` header to all requests
+3. Validates CSRF token for write operations (PUT/POST/DELETE)
+   - Compares `X-CSRFToken` header with `csrf-token` cookie
+   - Returns `403 Forbidden` if mismatch or missing
+4. Forwards requests to backend service (backstage.backstage.svc:7443)
+
+#### 3. nginx TLS Sidecar
+
+**Configuration**: `deployment/backstage-deployment-sqlite.yaml`
+
+The nginx sidecar MUST forward authentication headers to the Backstage backend:
+
+```nginx
+location / {
+  proxy_pass http://127.0.0.1:7007;
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto https;
+  
+  # CRITICAL: Forward authentication headers
+  proxy_set_header X-Forwarded-Access-Token $http_x_forwarded_access_token;
+  proxy_set_header Authorization $http_authorization;
+  
+  proxy_read_timeout 120s;
+  proxy_connect_timeout 30s;
+}
+```
+
+**Why this is required**:
+- Without these headers, the backend receives no authentication information
+- `$http_x_forwarded_access_token` maps to incoming `X-Forwarded-Access-Token` header
+- `$http_authorization` maps to incoming `Authorization` header
+- Nginx drops unknown headers by default, so we must explicitly forward them
+
+**Common Issue**: If you deploy Backstage without these headers, write operations will fail with `401 Unauthorized` or `403 Forbidden`.
+
+#### 4. MCP Entity API (Backend)
+
+**Location**: `backstage-app/packages/backend/src/plugins/mcp-entity-api/auth.ts`
+
+```typescript
+// Extract token from headers
+const token = 
+  req.headers['x-forwarded-access-token'] ||  // From console proxy
+  req.headers['authorization']?.replace('Bearer ', '');  // Direct API access
+
+// Validate token and check permissions
+const hasPermission = await validateOCPToken(token, entityType, operation);
+if (!hasPermission) {
+  return res.status(403).json({ error: 'Forbidden' });
+}
+```
+
+**RBAC Rules** (configured in `deployment/mcp-rbac.yaml`):
+
+| Role | MCP Servers | MCP Tools | MCP Workloads |
+|------|-------------|-----------|---------------|
+| `mcp-admin` | Full CRUD | Full CRUD | Read-only |
+| `mcp-user` | Read-only | Read-only | Full CRUD |
+| `mcp-viewer` | Read-only | Read-only | Read-only |
+
+### CSRF Protection
+
+**Purpose**: Prevent Cross-Site Request Forgery attacks
+
+**How it works**:
+1. OpenShift Console sets a `csrf-token` cookie (HttpOnly, Secure, SameSite)
+2. Frontend extracts the token and includes it as `X-CSRFToken` header
+3. Console proxy validates: header value must match cookie value
+4. If mismatch or missing: `403 Forbidden` with "invalid CSRFToken" error
+
+**Frontend Implementation**:
+```typescript
+// Extract from cookie
+const csrfToken = document.cookie
+  .split('; ')
+  .find(row => row.startsWith('csrf-token='))
+  ?.split('=')[1];
+
+// Include in request headers (write operations only)
+headers['X-CSRFToken'] = csrfToken;
+```
+
+**When it's required**:
+- ✅ PUT, POST, DELETE requests
+- ❌ GET requests (not required)
+
+### Testing Authentication
+
+#### Test with curl (Direct Access)
+```bash
+# Get your OpenShift token
+TOKEN=$(oc whoami -t)
+
+# Get Backstage route
+BACKSTAGE_URL=$(oc get route backstage -n backstage -o jsonpath='{.spec.host}')
+
+# Test read (no auth required)
+curl -k "https://${BACKSTAGE_URL}/api/mcp-entity-api/servers"
+
+# Test write (requires auth + RBAC)
+curl -k -X POST "https://${BACKSTAGE_URL}/api/mcp-entity-api/servers" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {"name": "test-server", "namespace": "default"},
+    "spec": {
+      "lifecycle": "experimental",
+      "owner": "user:default/admin",
+      "mcp": {
+        "connectionType": "stdio",
+        "command": "node server.js",
+        "version": "1.0.0"
+      }
+    }
+  }'
+```
+
+#### Test via Console Plugin
+
+1. Open OpenShift Console → MCP Catalog
+2. Navigate to a server detail page
+3. Try to disable a tool
+4. Expected result:
+   - ✅ If you have `mcp-admin` role: Tool disabled successfully
+   - ❌ If you lack `mcp-admin`: `403 Forbidden` error
+
+### Troubleshooting Authentication
+
+**Error: "401 Unauthorized"**
+- Cause: No authentication token provided
+- Check: nginx sidecar forwards `X-Forwarded-Access-Token` and `Authorization` headers
+- Fix: Ensure nginx config includes `proxy_set_header` directives (see above)
+
+**Error: "403 Forbidden" with "User lacks required role"**
+- Cause: User authenticated but lacks MCP RBAC permissions
+- Check: `oc auth can-i create mcpservers.mcp-catalog.io`
+- Fix: Add user to appropriate ClusterRoleBinding (see RBAC section)
+
+**Error: "403 Forbidden" with "invalid CSRFToken"**
+- Cause: CSRF token mismatch or missing
+- Check: Browser console for `X-CSRFToken` header in request
+- Fix: Ensure frontend extracts `csrf-token` cookie and includes it in headers
+
+**Error: "502 Bad Gateway"**
+- Cause: nginx sidecar not running or misconfigured
+- Check: `oc get pods -n backstage` (should show 2/2 Ready)
+- Fix: Redeploy with `oc apply -f deployment/backstage-deployment-sqlite.yaml`
+
+### Security Best Practices
+
+1. **Never log tokens**: Tokens are sensitive credentials
+2. **Use HTTPS only**: All communication encrypted via TLS
+3. **HttpOnly cookies**: Prevents JavaScript access to session tokens
+4. **CSRF protection**: Validates CSRF token for all write operations
+5. **Least privilege**: Assign users minimal required roles
+6. **Audit logs**: Monitor API access via Backstage backend logs
+
+---
+
 ## 🚀 Part A: Build and Deploy the Console Plugin
 
 ### A1. One-Command Deployment (Recommended)
@@ -183,6 +443,10 @@ Use the unified deployment script to build, push, deploy, and test in a single c
 ./build-push-deploy-test.sh --skip-tests    # Skip sanity tests after deployment
 ./build-push-deploy-test.sh --build-only    # Just build the container image
 ./build-push-deploy-test.sh --verbose       # Show detailed output
+
+# Target specific components:
+./build-push-deploy-test.sh --console-only   # Build/push/deploy console plugin only (default)
+./build-push-deploy-test.sh --backstage-only # Build/push/deploy backstage only
 ```
 
 **Configure your environment** by creating `.image-config.sh`:
@@ -190,15 +454,17 @@ Use the unified deployment script to build, push, deploy, and test in a single c
 ```bash
 IMAGE_REGISTRY="quay.io"
 IMAGE_ORG="your-org"
-IMAGE_NAME="mcp-tools-catalog"
+CONSOLE_IMAGE_NAME="mcp-tools-catalog"
+BACKSTAGE_IMAGE_NAME="backstage"
 IMAGE_TAG="latest"
 OPENSHIFT_NAMESPACE="mcp-tools-catalog"
 DEPLOYMENT_NAME="mcp-catalog"
 BACKSTAGE_NAMESPACE="backstage"
+BACKSTAGE_DEPLOYMENT_NAME="backstage"
 ```
 
 The script automatically:
-- Builds the Backstage and console plugins
+- Builds the console plugin (or backstage if using --backstage-only)
 - Pushes the container image to your registry
 - Updates the OpenShift deployment and forces a rollout
 - Restarts console pods for immediate effect
@@ -429,7 +695,29 @@ spec:
 EOF
 ```
 
-### B5. Add nginx TLS Sidecar (Required for Console Plugin)
+### B5. Update Backstage Image (Optional)
+
+If you need to rebuild and redeploy Backstage with code changes, use the unified script:
+
+```bash
+# Build, push, and deploy backstage only
+./build-push-deploy-test.sh --backstage-only
+
+# Skip tests for faster deployment
+./build-push-deploy-test.sh --backstage-only --skip-tests
+
+# Just rebuild without deploying
+./build-push-deploy-test.sh --backstage-only --build-only
+```
+
+**Note**: Configure backstage image settings in `.image-config.sh`:
+```bash
+BACKSTAGE_IMAGE_NAME="backstage"
+BACKSTAGE_NAMESPACE="backstage"
+BACKSTAGE_DEPLOYMENT_NAME="backstage"
+```
+
+### B6. Add nginx TLS Sidecar (Required for Console Plugin)
 
 The OpenShift console plugin proxy **requires HTTPS**. Add an nginx TLS-terminating sidecar:
 
@@ -473,7 +761,7 @@ oc patch deployment backstage -n backstage --type='strategic' -p='{
 - Proxies requests to Backstage on HTTP port 7007
 - Uses Red Hat UBI9 nginx image (compliant with registry policies)
 
-### B6. Create Backstage Service with HTTPS Port
+### B7. Create Backstage Service with HTTPS Port
 
 ```bash
 oc apply -f - <<'EOF'
@@ -498,7 +786,7 @@ spec:
 EOF
 ```
 
-### B7. Expose Backstage Route
+### B8. Expose Backstage Route
 
 ```bash
 oc expose svc/backstage --port=7007 -n backstage
@@ -506,7 +794,7 @@ oc patch route backstage -n backstage --type='merge' \
   -p='{"spec":{"tls":{"termination":"edge"}}}'
 ```
 
-### B8. Update Console Plugin to Use HTTPS Port
+### B9. Update Console Plugin to Use HTTPS Port
 
 ```bash
 oc patch consoleplugin mcp-catalog --type='json' -p='[
@@ -1132,14 +1420,20 @@ oc logs -n openshift-console -l app=console | grep -i mcp
 **Option 1: Use the unified script (recommended)**
 
 ```bash
-# Full update: build, push, deploy, test
+# Full update: build, push, deploy, test (console plugin)
 ./build-push-deploy-test.sh
+
+# Update backstage only
+./build-push-deploy-test.sh --backstage-only
 
 # Skip tests for faster deployment
 ./build-push-deploy-test.sh --skip-tests
 
 # Redeploy without rebuilding (uses existing image)
 ./build-push-deploy-test.sh --skip-build
+
+# Update backstage without tests
+./build-push-deploy-test.sh --backstage-only --skip-tests
 ```
 
 **Option 2: Manual update**

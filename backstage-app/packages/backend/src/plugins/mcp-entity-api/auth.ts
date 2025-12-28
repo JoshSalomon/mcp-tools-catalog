@@ -72,7 +72,7 @@ export class OCPAuthError extends Error {
 export function extractOCPToken(req: Request): string | undefined {
   // Check Authorization header first
   const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
+  if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7).trim();
     if (token) {
       return token;
@@ -80,9 +80,16 @@ export function extractOCPToken(req: Request): string | undefined {
   }
 
   // Check X-Forwarded-Access-Token (used by OpenShift console proxy)
+  // Note: Header names are case-insensitive, but Express normalizes them to lowercase
   const forwardedToken = req.headers['x-forwarded-access-token'];
   if (typeof forwardedToken === 'string' && forwardedToken.trim()) {
     return forwardedToken.trim();
+  }
+  
+  // Also check uppercase variant (some proxies might not normalize)
+  const forwardedTokenUpper = req.headers['X-Forwarded-Access-Token'];
+  if (typeof forwardedTokenUpper === 'string' && forwardedTokenUpper.trim()) {
+    return forwardedTokenUpper.trim();
   }
 
   return undefined;

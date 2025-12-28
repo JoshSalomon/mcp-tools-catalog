@@ -30,7 +30,6 @@ import { CatalogMcpServer, CATALOG_MCP_SERVER_KIND, CATALOG_MCP_SERVER_TYPE } fr
 import { useCatalogEntity, useCatalogEntities } from '../services/catalogService';
 import { getEntityName } from '../utils/hierarchicalNaming';
 import { validateToolReferences } from '../services/validationService';
-import { DependencyTreeView } from './shared/DependencyTreeView';
 
 /**
  * MCP Workload Detail Page for OpenShift Console
@@ -56,10 +55,13 @@ const McpWorkloadPage: React.FC = () => {
   const shouldFetch = Boolean(name);
 
   // Fetch workload entity
+  // Use full search string as cache key - timestamp parameter forces refetch after edits
   const [workload, workloadLoaded, workloadError] = useCatalogEntity<CatalogMcpWorkload>(
     CATALOG_MCP_WORKLOAD_KIND,
     shouldFetch ? name : '__placeholder__',
-    namespace
+    namespace,
+    location.search,  // Full query string includes timestamp, forcing refetch when changed
+    'workload'  // Explicitly fetch from workloads endpoint
   );
 
   // Fetch all tools for reference resolution and validation
@@ -85,6 +87,11 @@ const McpWorkloadPage: React.FC = () => {
     if (!workload) return [];
     
     const refs: string[] = [];
+    
+    // Check spec.dependsOn first (primary source for tool dependencies)
+    if (workload.spec.dependsOn) {
+      refs.push(...workload.spec.dependsOn);
+    }
     
     // Check spec.consumes array
     if (workload.spec.consumes) {
@@ -297,7 +304,9 @@ const McpWorkloadPage: React.FC = () => {
               <DescriptionListGroup>
                 <DescriptionListTerm>Description</DescriptionListTerm>
                 <DescriptionListDescription>
-                  {workload.metadata.description || 'No description available'}
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {workload.metadata.description || 'No description available'}
+                  </div>
                 </DescriptionListDescription>
               </DescriptionListGroup>
               <DescriptionListGroup>
@@ -377,46 +386,60 @@ const McpWorkloadPage: React.FC = () => {
                 <ExpandableSection
                   key={serverName}
                   toggleContent={
-                    <span>
-                      <ServerIcon style={{ marginRight: '0.5rem' }} />
-                      {serverName} ({serverTools.length} tool{serverTools.length !== 1 ? 's' : ''})
-                      {!serverExists(serverName) && serverName !== 'Unknown Server' && (
-                        <Label color="orange" isCompact style={{ marginLeft: '0.5rem' }}>
-                          Server Not Found
-                        </Label>
+                    <Flex alignItems={{ default: 'alignItemsCenter' }} style={{ width: '100%' }}>
+                      <FlexItem>
+                        <ServerIcon style={{ marginRight: '0.5rem' }} />
+                        {serverName} ({serverTools.length} tool{serverTools.length !== 1 ? 's' : ''})
+                        {!serverExists(serverName) && serverName !== 'Unknown Server' && (
+                          <Label color="orange" isCompact style={{ marginLeft: '0.5rem' }}>
+                            Server Not Found
+                          </Label>
+                        )}
+                      </FlexItem>
+                      {serverExists(serverName) && (
+                        <FlexItem align={{ default: 'alignRight' }}>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              history.push(`/mcp-catalog/servers/${serverName}?namespace=${namespace}`);
+                            }}
+                          >
+                            Details
+                          </Button>
+                        </FlexItem>
                       )}
-                    </span>
+                    </Flex>
                   }
                   isExpanded={expandedServers.has(serverName)}
                   onToggle={() => toggleServerExpanded(serverName)}
                   style={{ marginBottom: '1rem' }}
                 >
                   <div style={{ paddingLeft: '1rem' }}>
-                    {serverExists(serverName) && (
-                      <div style={{ marginBottom: '0.5rem' }}>
-                        <a
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            history.push(`/mcp-catalog/servers/${serverName}?namespace=${namespace}`);
-                          }}
-                        >
-                          View Server Details →
-                        </a>
-                      </div>
-                    )}
                     <Table aria-label={`Tools from ${serverName}`} variant="compact">
                       <Thead>
                         <Tr>
-                          <Th>Tool Name</Th>
-                          <Th>Type</Th>
-                          <Th>Lifecycle</Th>
-                          <Th>Status</Th>
+                          <Th width={10}>Status</Th>
+                          <Th width={40}>Tool Name</Th>
+                          <Th width={25}>Type</Th>
+                          <Th width={25}>Lifecycle</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
                         {serverTools.map((toolRef) => (
                           <Tr key={toolRef.ref}>
+                            <Td dataLabel="Status">
+                              {toolRef.isValid ? (
+                                toolRef.tool && isToolDisabled(toolRef.tool) ? (
+                                  <Label color="orange" isCompact>Disabled</Label>
+                                ) : (
+                                  <Label color="green" isCompact>Valid</Label>
+                                )
+                              ) : (
+                                <Label color="red" isCompact>Not Found</Label>
+                              )}
+                            </Td>
                             <Td dataLabel="Tool Name">
                               {toolRef.isValid ? (
                                 <a
@@ -440,17 +463,6 @@ const McpWorkloadPage: React.FC = () => {
                             <Td dataLabel="Lifecycle">
                               {toolRef.tool?.spec.lifecycle || 'N/A'}
                             </Td>
-                            <Td dataLabel="Status">
-                              {toolRef.isValid ? (
-                                toolRef.tool && isToolDisabled(toolRef.tool) ? (
-                                  <Label color="orange" isCompact>Disabled</Label>
-                                ) : (
-                                  <Label color="green" isCompact>Valid</Label>
-                                )
-                              ) : (
-                                <Label color="red" isCompact>Not Found</Label>
-                              )}
-                            </Td>
                           </Tr>
                         ))}
                       </Tbody>
@@ -463,21 +475,6 @@ const McpWorkloadPage: React.FC = () => {
         </Card>
       </PageSection>
 
-      <PageSection>
-        <Card>
-          <CardBody>
-            <Title headingLevel="h2" size="md" style={{ marginBottom: '1rem' }}>
-              Dependency Tree
-            </Title>
-            <DependencyTreeView
-              workload={workload}
-              tools={tools || []}
-              servers={servers || []}
-              namespace={namespace}
-            />
-          </CardBody>
-        </Card>
-      </PageSection>
     </>
   );
 };

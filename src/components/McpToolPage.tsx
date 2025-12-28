@@ -51,21 +51,23 @@ const McpToolPage: React.FC = () => {
   const [tool, toolLoaded, toolError] = useCatalogEntity<CatalogMcpTool>(
     CATALOG_MCP_TOOL_KIND,
     shouldFetch ? name : '__placeholder__',
-    namespace
+    namespace,
+    location.key,  // Simple cache key
+    'tool'  // Explicitly fetch from tools endpoint
   );
 
   // Fetch all servers to find parent server
   const [servers, serversLoaded] = useCatalogEntities<CatalogMcpServer>(
     CATALOG_MCP_SERVER_KIND,
-    undefined,
-    namespace
+    'mcp-server',  // ✅ Specify type to use MCP Entity API /servers endpoint
+    undefined       // Don't filter by namespace - fetch from all namespaces
   );
 
   // Fetch all workloads to find ones that use this tool
   const [workloads, workloadsLoaded] = useCatalogEntities<CatalogMcpWorkload>(
     CATALOG_MCP_WORKLOAD_KIND,
-    undefined,
-    namespace
+    'mcp-workload',  // ✅ Specify type to use MCP Entity API /workloads endpoint
+    undefined        // Don't filter by namespace - fetch from all namespaces
   );
 
   React.useEffect(() => {
@@ -132,13 +134,19 @@ const McpToolPage: React.FC = () => {
     const toolRef = `component:${namespace}/${name}`;
     
     return workloads.filter(workload => {
-      // Check spec.consumes array
+      // Check spec.dependsOn array (primary field for tool dependencies, used by API-created workloads)
+      const dependsOn = workload.spec.dependsOn || [];
+      if (dependsOn.includes(toolRef) || dependsOn.includes(name)) {
+        return true;
+      }
+      
+      // Check spec.consumes array (used by YAML-defined workloads)
       const consumes = workload.spec.consumes || [];
       if (consumes.includes(toolRef) || consumes.includes(name)) {
         return true;
       }
       
-      // Check spec.mcp.tools array
+      // Check spec.mcp.tools array (legacy field, used by YAML-defined workloads)
       const mcpTools = (workload.spec as any).mcp?.tools || [];
       if (mcpTools.includes(toolRef) || mcpTools.includes(name)) {
         return true;

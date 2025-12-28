@@ -1,0 +1,40 @@
+# mcp-tools-catalog Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2025-12-18
+
+## Active Technologies
+- Backstage Catalog API (entity annotations) (002-disable-tools-checkbox)
+- TypeScript 4.7+ (strict mode per constitution) + @backstage/backend-defaults, @backstage/plugin-catalog-node, @backstage/plugin-permission-backend (003-entity-management-api)
+- Backstage Catalog Database (existing PostgreSQL via catalog-backend) (003-entity-management-api)
+- Backstage Catalog Database (existing PostgreSQL via catalog-backend) - authoritative source of truth (003-entity-management-api)
+- Backstage Catalog database (via Entity Management API backend plugin) (004-editing-capabilities)
+
+- TypeScript 4.7+, Node.js 18+ + React 17.x, @patternfly/react-core 6.2+, @openshift-console/dynamic-plugin-sdk 1.4.0, @backstage/catalog-model ^1.7.5 (001-disable-tools-checkbox)
+
+## Project Structure
+
+```text
+src/
+tests/
+```
+
+## Commands
+
+npm test && npm run lint
+
+## Code Style
+
+TypeScript 4.7+, Node.js 18+: Follow standard conventions
+
+## Recent Changes
+- 004-editing-capabilities: Added TypeScript 4.7+, Node.js 18+
+- 003-entity-management-api: Added TypeScript 4.7+ (strict mode per constitution) + @backstage/backend-defaults, @backstage/plugin-catalog-node, @backstage/plugin-permission-backend
+- 003-entity-management-api: Added TypeScript 4.7+ (strict mode per constitution) + @backstage/backend-defaults, @backstage/plugin-catalog-node, @backstage/plugin-permission-backend
+
+
+<!-- MANUAL ADDITIONS START -->
+
+## Project rules
+- Backend architecture: The source of truth comes from backstage database, with overides from the internal database. This pattern should be kept since we are not modifying backstage just augmenting it.
+
+<!-- MANUAL ADDITIONS END -->
