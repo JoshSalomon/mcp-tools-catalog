@@ -576,55 +576,6 @@ export async function createRouter(
   );
 
   // ==========================================================================
-  // Admin Endpoints - /admin/* (Development/Testing)
-  // ==========================================================================
-  // These endpoints are for developers with admin access to manage soft-deleted
-  // workloads during testing. No production RBAC required (assumes admin access).
-
-  /**
-   * GET /admin/soft-deleted-workloads
-   * List all soft-deleted workloads
-   */
-  router.get(
-    '/admin/soft-deleted-workloads',
-    asyncHandler(async (_req, res) => {
-      const result = await service.listSoftDeletedWorkloads();
-      sendSuccessResponse(res, result);
-    }),
-  );
-
-  /**
-   * DELETE /admin/soft-deleted-workloads/:namespace/:name?mode=undelete|hard-delete
-   * Manage soft-deleted workloads:
-   * - mode=undelete: Remove soft-delete flags (restore workload to UI)
-   * - mode=hard-delete: Completely remove from database (allows creating new workload with same name)
-   */
-  router.delete(
-    '/admin/soft-deleted-workloads/:namespace/:name',
-    asyncHandler(async (req, res) => {
-      const { namespace, name } = req.params;
-      const mode = req.query.mode as string;
-
-      if (mode === 'undelete') {
-        await service.undeleteWorkload(namespace, name);
-        sendSuccessResponse(res, { 
-          message: `Workload component:${namespace}/${name} has been undeleted (soft-delete flags removed)` 
-        });
-      } else if (mode === 'hard-delete') {
-        await service.hardDeleteWorkload(namespace, name);
-        sendSuccessResponse(res, { 
-          message: `Workload component:${namespace}/${name} has been hard deleted from database` 
-        });
-      } else {
-        res.status(400).json({
-          error: 'BadRequest',
-          message: 'Query parameter "mode" must be either "undelete" or "hard-delete"',
-        });
-      }
-    }),
-  );
-
-  // ==========================================================================
   // Error Handling Middleware (T031)
   // ==========================================================================
 

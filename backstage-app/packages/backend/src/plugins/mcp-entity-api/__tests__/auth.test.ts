@@ -41,8 +41,8 @@ jest.mock('@kubernetes/client-node', () => {
         return {};
       }),
     })),
-    AuthorizationV1Api: Object.assign(jest.fn(), { name: 'AuthorizationV1Api' }),
-    AuthenticationV1Api: Object.assign(jest.fn(), { name: 'AuthenticationV1Api' }),
+    AuthorizationV1Api: function AuthorizationV1Api() {},
+    AuthenticationV1Api: function AuthenticationV1Api() {},
     V1SubjectAccessReview: jest.fn().mockImplementation((obj) => obj),
     __mockCreateSubjectAccessReview: mockCreateSubjectAccessReview,
     __mockCreateTokenReview: mockCreateTokenReview,

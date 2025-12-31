@@ -216,10 +216,14 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
               value={formState.formData.name}
               onChange={(_event, value) => formState.updateField('name', value)}
               isRequired
-              isDisabled={isEditMode}
               validated={formState.errors.name ? 'error' : 'default'}
               aria-label="Workload name"
             />
+            {isEditMode && !formState.errors.name && (
+              <div style={{ color: '#6a6e73', fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                Changing the name will rename the workload
+              </div>
+            )}
             {formState.errors.name && (
               <div style={{ color: '#c9190b', fontSize: '0.875rem', marginTop: '0.25rem' }}>
                 {formState.errors.name}
