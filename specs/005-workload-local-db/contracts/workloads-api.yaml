@@ -1,0 +1,438 @@
+openapi: 3.0.3
+info:
+  title: MCP Entity API - Workloads
+  description: |
+    RESTful API for managing MCP Workload entities.
+
+    **This feature (005-workload-local-db)**: API contract remains unchanged.
+    Backend implementation changes from catalog+database merge to database-only.
+  version: 2.0.0
+  contact:
+    name: MCP Tools Catalog Team
+
+servers:
+  - url: /api/mcp-entity-api
+    description: Backstage backend proxy
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Workloads
+    description: CRUD operations for MCP Workloads
+
+paths:
+  /workloads:
+    get:
+      tags: [Workloads]
+      summary: List all workloads
+      description: |
+        Returns all workloads from the database.
+        No authentication required for read operations.
+      operationId: listWorkloads
+      parameters:
+        - name: namespace
+          in: query
+          description: Filter by namespace
+          schema:
+            type: string
+            default: default
+      responses:
+        '200':
+          description: List of workloads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Workload'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags: [Workloads]
+      summary: Create a new workload
+      description: |
+        Creates a new workload in the database.
+        Requires `mcp-user` role.
+      operationId: createWorkload
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkloadInput'
+      responses:
+        '201':
+          description: Workload created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workload'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /workloads/{namespace}/{name}:
+    parameters:
+      - name: namespace
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Workload namespace
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Workload name
+
+    get:
+      tags: [Workloads]
+      summary: Get a specific workload
+      description: |
+        Returns a single workload by namespace and name.
+        No authentication required for read operations.
+      operationId: getWorkload
+      responses:
+        '200':
+          description: Workload found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workload'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      tags: [Workloads]
+      summary: Update a workload
+      description: |
+        Updates an existing workload.
+        Requires `mcp-user` role.
+
+        **New in v2.0.0**: Supports renaming. If `metadata.name` differs from
+        the URL path `name`, the workload is renamed.
+      operationId: updateWorkload
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkloadInput'
+      responses:
+        '200':
+          description: Workload updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workload'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Conflict - new name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags: [Workloads]
+      summary: Delete a workload
+      description: |
+        Permanently deletes a workload from the database.
+        Requires `mcp-user` role.
+
+        **Changed in v2.0.0**: Always performs hard delete (no soft delete).
+      operationId: deleteWorkload
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Workload deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /workloads/import:
+    post:
+      tags: [Workloads]
+      summary: Import workloads from YAML (P3)
+      description: |
+        Bulk import workloads from YAML definitions.
+        Skips existing workloads (does not overwrite).
+        Requires `mcp-user` role.
+
+        **Priority**: P3 (optional feature)
+      operationId: importWorkloads
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/yaml:
+            schema:
+              type: string
+              description: YAML document containing workload definitions
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/WorkloadInput'
+      responses:
+        '200':
+          description: Import results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: OpenShift OAuth token
+
+  schemas:
+    Workload:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+          enum: [backstage.io/v1alpha1]
+        kind:
+          type: string
+          enum: [Component]
+        metadata:
+          $ref: '#/components/schemas/WorkloadMetadata'
+        spec:
+          $ref: '#/components/schemas/WorkloadSpec'
+
+    WorkloadInput:
+      type: object
+      required:
+        - metadata
+        - spec
+      properties:
+        metadata:
+          $ref: '#/components/schemas/WorkloadMetadataInput'
+        spec:
+          $ref: '#/components/schemas/WorkloadSpec'
+
+    WorkloadMetadata:
+      type: object
+      required:
+        - name
+        - namespace
+      properties:
+        name:
+          type: string
+          description: Unique name within namespace
+          pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'
+          minLength: 1
+          maxLength: 63
+          example: my-workload
+        namespace:
+          type: string
+          description: Namespace for isolation
+          default: default
+          example: default
+        description:
+          type: string
+          description: Human-readable description
+          maxLength: 1000
+          example: A workload for data processing
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+          description: Arbitrary key-value annotations
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+          description: Labels for filtering
+
+    WorkloadMetadataInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'
+          minLength: 1
+          maxLength: 63
+        namespace:
+          type: string
+          default: default
+        description:
+          type: string
+          maxLength: 1000
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+
+    WorkloadSpec:
+      type: object
+      required:
+        - type
+        - lifecycle
+        - owner
+        - dependsOn
+      properties:
+        type:
+          type: string
+          enum: [mcp-workload, service, workflow]
+          description: Workload type
+          example: mcp-workload
+        lifecycle:
+          type: string
+          description: Lifecycle stage
+          example: production
+        owner:
+          type: string
+          description: Owner reference (team or user)
+          example: team:platform
+        system:
+          type: string
+          description: Optional system grouping
+          example: data-platform
+        dependsOn:
+          type: array
+          items:
+            type: string
+            pattern: '^component:[a-z0-9-]+/[a-z0-9-]+$'
+          description: Tool entity references
+          example:
+            - component:default/github-search-repos
+            - component:default/filesystem-read
+
+    ImportResult:
+      type: object
+      properties:
+        created:
+          type: array
+          items:
+            type: string
+          description: Names of created workloads
+        skipped:
+          type: array
+          items:
+            type: string
+          description: Names of skipped workloads (already exist)
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              error:
+                type: string
+          description: Workloads that failed to import
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: ConflictError
+        message:
+          type: string
+          description: Human-readable error message
+          example: Workload with this name already exists
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: BadRequestError
+            message: Invalid workload name format
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: ForbiddenError
+            message: User does not have mcp-user role
+
+    NotFound:
+      description: Workload not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: NotFoundError
+            message: Workload 'default/my-workload' not found
+
+    Conflict:
+      description: Name already exists
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: ConflictError
+            message: Workload with this name already exists
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: InternalServerError
+            message: Database connection failed

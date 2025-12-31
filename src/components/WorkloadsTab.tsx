@@ -118,8 +118,12 @@ const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
   const handleEditWorkload = React.useCallback(async (formData: any) => {
     if (!editingWorkload) return;
 
+    const newName = formData.name || editingWorkload.metadata.name;
+    const namespace = editingWorkload.metadata.namespace || 'default';
+
     const workloadData = {
       metadata: {
+        name: newName, // Include name for rename support
         description: formData.description || undefined,
       },
       spec: {
@@ -131,14 +135,14 @@ const WorkloadsTab: React.FC<WorkloadsTabProps> = ({ initialSearch = '' }) => {
     };
 
     await updateWorkload(
-      editingWorkload.metadata.namespace || 'default',
-      editingWorkload.metadata.name,
-      workloadData
+      namespace,
+      editingWorkload.metadata.name, // Original name in URL
+      workloadData // New name in payload triggers rename
     );
-    
-    // Navigate with timestamp to force cache invalidation (faster than full page reload)
+
+    // Navigate to the (potentially new) workload name
     history.push(
-      `/mcp-catalog/workloads/${editingWorkload.metadata.name}?namespace=${editingWorkload.metadata.namespace || 'default'}&t=${Date.now()}`
+      `/mcp-catalog/workloads/${newName}?namespace=${namespace}&t=${Date.now()}`
     );
     setEditingWorkload(null);
   }, [editingWorkload, history]);

@@ -2,11 +2,15 @@
 
 ## Overview
 
-The MCP Entity API uses a **merge architecture** to combine:
+The MCP Entity API uses a **merge architecture** for **Servers and Tools** to combine:
 - **Backstage Catalog** - Entity definitions (source of truth from YAML/GitHub)
 - **SQLite Database** - Runtime state (disabled flags, user modifications)
 
 This allows runtime state to persist without modifying Backstage core or YAML files.
+
+> **Note**: **Workloads use database-only storage** (no catalog merge). This simplifies
+> CRUD operations, enables workload renaming, and eliminates soft-delete complexity.
+> See [Implementation Details](#workloads-database-only) section.
 
 ## Architecture Diagram
 
@@ -314,21 +318,24 @@ async getTool() {
 
 **Primary**: `backstage-app/packages/backend/src/plugins/mcp-entity-api/service.ts`
 
-**Methods with Merge Logic**:
+**Methods with Merge Logic (Servers/Tools only)**:
 - `getServer(namespace, name)` - Merges catalog + database
 - `getTool(namespace, name)` - Merges catalog + database
-- `getWorkload(namespace, name)` - Merges catalog + database
 - `listServers(params)` - Merges all servers
 - `listTools(params)` - Merges all tools
-- `listWorkloads(params)` - Merges all workloads
 
-**Methods with Catalog Check**:
+**Methods with Catalog Check (Servers/Tools only)**:
 - `updateServer()` - Checks catalog for existence
 - `updateTool()` - Checks catalog for existence + parent
-- `updateWorkload()` - Checks catalog for existence
 - `deleteServer()` - Checks catalog for existence
 - `deleteTool()` - Checks catalog for existence
-- `deleteWorkload()` - Checks catalog for existence
+
+**Workloads (Database-Only)**:
+- `createWorkload()` - Database only, no catalog
+- `getWorkload()` - Database only, no merge
+- `listWorkloads()` - Database only, no merge
+- `updateWorkload()` - Database only, supports rename
+- `deleteWorkload()` - Database only, hard delete
 
 ### Database Schema
 

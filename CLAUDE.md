@@ -1,6 +1,6 @@
 # mcp-tools-catalog Development Guidelines
 
-Last updated: 2025-12-11
+Last updated: 2025-12-30
 
 ## Active Technologies
 - TypeScript 4.7+, Node.js 18+
@@ -10,6 +10,8 @@ Last updated: 2025-12-11
 - @backstage/catalog-model ^1.7.5 (peerDependency)
 - Jest + React Testing Library for unit tests
 - Backstage catalog backend (existing) - no additional storage required
+- TypeScript 4.7+ (strict mode), Node.js 18+ + Express (Backstage backend), React 17.x (frontend), PatternFly 6.2+, @backstage/catalog-model ^1.7.5 (005-workload-local-db)
+- SQLite 3.x (existing mcp-entity-api database) (005-workload-local-db)
 
 ## Project Structure
 
@@ -99,6 +101,21 @@ All MCP entities are standard Backstage `Component` kind:
 - React hooks for state management
 - Client-side filtering after initial API fetch
 
+## Constitutional Principles
+
+The project follows a constitution (`.specify/memory/constitution.md` v1.5.0). Key principles:
+
+### User Verification of Fixes (Principle XI)
+- When the user identifies a problem, the proposed solution MUST be verified by the user before implementation
+- When the user provides explicit instructions, do NOT request additional verification
+- This prevents automated fixes that lack context while avoiding redundant confirmations
+
+### Red Hat Registry First (Principle X)
+- Container images MUST use Red Hat registries (registry.redhat.io, registry.access.redhat.com, quay.io)
+- Docker Hub (docker.io) MUST NOT be used due to rate limiting
+- Base images should prefer UBI (Universal Base Image) variants
+- Dockerfiles MUST explicitly specify full registry paths
+
 ## Implementation Status
 
 - ✅ Phase 1: Setup & Foundation
@@ -162,3 +179,6 @@ All MCP entities are standard Backstage `Component` kind:
 - [DISABLE-TOOLS-FIX-COMPLETE.md](./DISABLE-TOOLS-FIX-COMPLETE.md) - Disable feature documentation
 - [AUTHENTICATION.md](./AUTHENTICATION.md) - Authentication architecture
 - [DOCUMENTATION-INDEX.md](./DOCUMENTATION-INDEX.md) - Complete documentation index
+
+## Recent Changes
+- 005-workload-local-db: Added TypeScript 4.7+ (strict mode), Node.js 18+ + Express (Backstage backend), React 17.x (frontend), PatternFly 6.2+, @backstage/catalog-model ^1.7.5

@@ -5,6 +5,8 @@
  * following Backstage catalog-model conventions.
  */
 
+import type { JsonValue } from '@backstage/types';
+
 // =============================================================================
 // Entity Metadata Types
 // =============================================================================
@@ -17,6 +19,8 @@ export interface MCPEntityMetadata {
   labels?: Record<string, string>;
   annotations?: Record<string, string>;
   tags?: string[];
+  // Index signature for JsonObject compatibility with Backstage Entity types
+  [key: string]: JsonValue | undefined;
 }
 
 // =============================================================================

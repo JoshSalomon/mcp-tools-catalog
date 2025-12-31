@@ -202,27 +202,30 @@ export class MCPEntityDatabase {
 
   /**
    * Delete entities by parent (for cascade delete)
+   * Returns the entity refs of deleted entities for entityProvider cleanup
    */
-  async deleteByParent(parentRef: string): Promise<number> {
+  async deleteByParent(parentRef: string): Promise<string[]> {
     // Get all tools that belong to this parent
     const rows = await this.db<MCPEntityRow>(TABLE_NAME)
       .where({ entity_type: 'mcp-tool' })
-      .select('id', 'entity_json');
+      .select('id', 'entity_ref', 'entity_json');
 
-    const toDelete: string[] = [];
+    const toDelete: { id: string; entityRef: string }[] = [];
     for (const row of rows) {
       const entity = JSON.parse(row.entity_json) as Entity;
       if ((entity.spec as any)?.subcomponentOf === parentRef) {
-        toDelete.push(row.id);
+        toDelete.push({ id: row.id, entityRef: row.entity_ref });
       }
     }
 
+    const deletedRefs: string[] = [];
     if (toDelete.length > 0) {
-      await this.db(TABLE_NAME).whereIn('id', toDelete).delete();
+      await this.db(TABLE_NAME).whereIn('id', toDelete.map(t => t.id)).delete();
+      deletedRefs.push(...toDelete.map(t => t.entityRef));
       this.logger.info('Cascade deleted entities', { parentRef, count: toDelete.length });
     }
 
-    return toDelete.length;
+    return deletedRefs;
   }
 
   /**
