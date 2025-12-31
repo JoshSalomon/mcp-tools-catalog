@@ -63,8 +63,8 @@
 
 ### Tests for User Story 1
 
-- [ ] T013 [US1] Write unit test for createWorkload() database-only path in `backstage-app/packages/backend/src/plugins/mcp-entity-api/service.test.ts`
-- [ ] T014 [US1] Write sanity test for POST /workloads endpoint in `tests/sanity/workload-crud.sh`
+- [x] T013 [US1] Write unit test for createWorkload() database-only path in `backstage-app/packages/backend/src/plugins/mcp-entity-api/__tests__/workload-service.test.ts`
+- [x] T014 [US1] Write sanity test for POST /workloads endpoint in `tests/sanity/workload-crud.sh`
 
 **Checkpoint**: Create workload works with database-only storage
 
@@ -86,9 +86,9 @@
 
 ### Tests for User Story 2
 
-- [ ] T019 [P] [US2] Write unit test for listWorkloads() database-only path in `backstage-app/packages/backend/src/plugins/mcp-entity-api/service.test.ts`
-- [ ] T020 [P] [US2] Write unit test for getWorkload() database-only path in `backstage-app/packages/backend/src/plugins/mcp-entity-api/service.test.ts`
-- [ ] T021 [US2] Add sanity test for GET /workloads and GET /workloads/:ns/:name in `tests/sanity/workload-crud.sh`
+- [x] T019 [P] [US2] Write unit test for listWorkloads() database-only path in `backstage-app/packages/backend/src/plugins/mcp-entity-api/__tests__/workload-service.test.ts`
+- [x] T020 [P] [US2] Write unit test for getWorkload() database-only path in `backstage-app/packages/backend/src/plugins/mcp-entity-api/__tests__/workload-service.test.ts`
+- [x] T021 [US2] Add sanity test for GET /workloads and GET /workloads/:ns/:name in `tests/sanity/workload-crud.sh`
 
 **Checkpoint**: View/browse workloads works with database-only storage
 
@@ -112,9 +112,9 @@
 
 ### Tests for User Story 3
 
-- [ ] T028 [P] [US3] Write unit test for updateWorkload() with same name in `backstage-app/packages/backend/src/plugins/mcp-entity-api/service.test.ts`
-- [ ] T029 [P] [US3] Write unit test for updateWorkload() with rename in `backstage-app/packages/backend/src/plugins/mcp-entity-api/service.test.ts`
-- [ ] T030 [US3] Add sanity test for PUT /workloads/:ns/:name (update and rename) in `tests/sanity/workload-crud.sh`
+- [x] T028 [P] [US3] Write unit test for updateWorkload() with same name in `backstage-app/packages/backend/src/plugins/mcp-entity-api/__tests__/workload-service.test.ts`
+- [x] T029 [P] [US3] Write unit test for updateWorkload() with rename in `backstage-app/packages/backend/src/plugins/mcp-entity-api/__tests__/workload-service.test.ts`
+- [x] T030 [US3] Add sanity test for PUT /workloads/:ns/:name (update and rename) in `tests/sanity/workload-crud.sh`
 
 **Checkpoint**: Edit workload (including rename) works with database-only storage
 
@@ -134,9 +134,9 @@
 
 ### Tests for User Story 4
 
-- [ ] T034 [US4] Write unit test for deleteWorkload() hard delete in `backstage-app/packages/backend/src/plugins/mcp-entity-api/service.test.ts`
-- [ ] T035 [US4] Add sanity test for DELETE /workloads/:ns/:name (verify permanent deletion) in `tests/sanity/workload-crud.sh`
-- [ ] T036 [US4] Verify no "zombie" reappearance after delete (wait and re-check) in `tests/sanity/workload-crud.sh`
+- [x] T034 [US4] Write unit test for deleteWorkload() hard delete in `backstage-app/packages/backend/src/plugins/mcp-entity-api/__tests__/workload-service.test.ts`
+- [x] T035 [US4] Add sanity test for DELETE /workloads/:ns/:name (verify permanent deletion) in `tests/sanity/workload-crud.sh`
+- [x] T036 [US4] Verify no "zombie" reappearance after delete (wait and re-check) in `tests/sanity/workload-crud.sh`
 
 **Checkpoint**: Delete workload is permanent with no zombie reappearance
 

@@ -330,6 +330,13 @@ describe('RBAC Integration Tests', () => {
     });
 
     it('should return proper error format for validation errors', async () => {
+      // Import ValidationError from the errors module
+      const { ValidationError } = require('../errors');
+
+      // Make the mock service throw a proper ValidationError
+      const validationError = new ValidationError('Missing required field: metadata.name');
+      (mockService.createServer as jest.Mock).mockRejectedValueOnce(validationError);
+
       // Send invalid payload to trigger validation error
       const response = await request(app)
         .post('/api/mcp-entity-api/servers')
