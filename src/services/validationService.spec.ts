@@ -84,9 +84,7 @@ describe('validationService', () => {
           lifecycle: 'production',
           owner: 'ops-team',
         },
-        relations: [
-          { type: 'partOf', targetRef: 'component:default/kubernetes-mcp' },
-        ],
+        relations: [{ type: 'partOf', targetRef: 'component:default/kubernetes-mcp' }],
       };
 
       expect(validateServerReference(tool, mockServers)).toBe(true);

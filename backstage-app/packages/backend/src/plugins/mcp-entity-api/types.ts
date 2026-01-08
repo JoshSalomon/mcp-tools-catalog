@@ -116,10 +116,93 @@ export interface MCPWorkloadEntity {
 }
 
 // =============================================================================
+// MCP Guardrail Types
+// =============================================================================
+
+export type ExecutionTiming = 'pre-execution' | 'post-execution';
+export type GuardrailSource = 'tool' | 'workload';
+
+export interface Guardrail {
+  id: string;
+  namespace: string;
+  name: string;
+  description: string;
+  deployment: string;
+  parameters?: string;
+  disabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GuardrailWithUsage extends Guardrail {
+  usage: {
+    tools: ToolGuardrailAssociation[];
+    workloadTools: WorkloadToolGuardrailAssociation[];
+  };
+}
+
+export interface ToolGuardrailAssociation {
+  id: string;
+  toolNamespace: string;
+  toolName: string;
+  guardrailId: string;
+  guardrail?: Guardrail;
+  executionTiming: ExecutionTiming;
+  parameters?: string;
+  createdAt: string;
+}
+
+export interface WorkloadToolGuardrailAssociation {
+  id: string;
+  workloadNamespace: string;
+  workloadName: string;
+  toolNamespace: string;
+  toolName: string;
+  guardrailId: string;
+  guardrail?: Guardrail;
+  executionTiming: ExecutionTiming;
+  source: GuardrailSource;
+  parameters?: string;
+  createdAt: string;
+}
+
+export interface CreateGuardrailInput {
+  metadata: {
+    name: string;
+    namespace?: string;
+    description: string;
+  };
+  spec: {
+    deployment: string;
+    parameters?: string;
+    disabled?: boolean;
+  };
+}
+
+export interface UpdateGuardrailInput {
+  metadata?: {
+    name?: string;
+    description?: string;
+  };
+  spec?: {
+    deployment?: string;
+    parameters?: string;
+    disabled?: boolean;
+  };
+}
+
+export interface AttachGuardrailInput {
+  guardrailNamespace: string;
+  guardrailName: string;
+  executionTiming: ExecutionTiming;
+  parameters?: string;
+}
+
+// =============================================================================
 // Unified Types
 // =============================================================================
 
-export type MCPEntityType = 'mcp-server' | 'mcp-tool' | 'mcp-workload';
+export type MCPEntityType = 'mcp-server' | 'mcp-tool' | 'mcp-workload' | 'mcp-guardrail';
 export type MCPEntity = MCPServerEntity | MCPToolEntity | MCPWorkloadEntity;
 export type MCPEntityInput = MCPServerInput | MCPToolInput | MCPWorkloadInput;
 
@@ -154,5 +237,6 @@ export interface MCPEntityApiConfig {
     server: string;
     tool: string;
     workload: string;
+    guardrail: string;
   };
 }

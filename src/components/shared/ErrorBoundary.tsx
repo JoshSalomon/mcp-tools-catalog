@@ -33,7 +33,7 @@ interface ErrorBoundaryState {
 /**
  * Error boundary component that catches JavaScript errors in child components
  * and displays a fallback UI instead of crashing the entire application.
- * 
+ *
  * @example
  * ```tsx
  * <ErrorBoundary>
@@ -57,10 +57,10 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     this.setState({ errorInfo });
-    
+
     // Log error to console in development
     console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
+
     // Call optional error callback
     if (this.props.onError) {
       this.props.onError(error, errorInfo);

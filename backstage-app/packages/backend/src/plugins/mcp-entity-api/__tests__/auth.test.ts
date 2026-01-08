@@ -278,6 +278,7 @@ describe('Auth Module', () => {
         server: 'mcp-admin',
         tool: 'mcp-admin',
         workload: 'mcp-user',
+        guardrail: 'mcp-admin',
       },
     };
 
@@ -302,6 +303,7 @@ describe('Auth Module', () => {
           server: 'custom-server-role',
           tool: 'custom-tool-role',
           workload: 'custom-workload-role',
+          guardrail: 'custom-guardrail-role',
         },
       };
 

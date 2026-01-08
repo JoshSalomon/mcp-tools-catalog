@@ -11,7 +11,6 @@
  */
 
 import type { Entity } from '@backstage/catalog-model';
-import type { Logger } from 'winston';
 
 // Mock types for testing
 interface MockDatabase {
@@ -32,7 +31,10 @@ interface MockCatalog {
 }
 
 // Helper to create a mock workload entity
-const createMockWorkload = (name: string, overrides?: Partial<Entity>): Entity => ({
+const createMockWorkload = (name: string, overrides?: {
+  metadata?: Partial<Entity['metadata']>;
+  spec?: Partial<Entity['spec']>;
+}): Entity => ({
   apiVersion: 'backstage.io/v1alpha1',
   kind: 'Component',
   metadata: {
@@ -50,20 +52,10 @@ const createMockWorkload = (name: string, overrides?: Partial<Entity>): Entity =
   },
 });
 
-// Helper to create mock logger
-const createMockLogger = (): Logger => ({
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  debug: jest.fn(),
-  child: jest.fn().mockReturnThis(),
-} as unknown as Logger);
-
 describe('Workload Service - Database-Only Operations', () => {
   let mockDatabase: MockDatabase;
   let mockEntityProvider: MockEntityProvider;
   let mockCatalog: MockCatalog;
-  let mockLogger: Logger;
 
   beforeEach(() => {
     // Reset all mocks
@@ -83,8 +75,6 @@ describe('Workload Service - Database-Only Operations', () => {
     mockCatalog = {
       getEntityByRef: jest.fn(),
     };
-
-    mockLogger = createMockLogger();
   });
 
   // ==========================================================================
@@ -96,11 +86,6 @@ describe('Workload Service - Database-Only Operations', () => {
       mockDatabase.exists.mockResolvedValue(false);
       mockDatabase.upsertEntity.mockResolvedValue(undefined);
       mockEntityProvider.updateEntity.mockResolvedValue(undefined);
-
-      const input = {
-        metadata: { name: 'new-workload', description: 'Test' },
-        spec: { type: 'mcp-workload', dependsOn: [] },
-      };
 
       // Act - simulate createWorkload logic
       const exists = await mockDatabase.exists('component:default/new-workload');
@@ -278,14 +263,8 @@ describe('Workload Service - Database-Only Operations', () => {
       });
       mockDatabase.getEntity.mockResolvedValue(existingWorkload);
 
-      // Act - update only lifecycle
-      const updateInput = {
-        metadata: { name: 'my-workload' },
-        spec: { type: 'mcp-workload', lifecycle: 'deprecated' },
-      };
-
       // Assert - other fields should be preserved in real implementation
-      expect(existingWorkload.spec.owner).toBe('team-a');
+      expect(existingWorkload.spec?.owner).toBe('team-a');
     });
   });
 

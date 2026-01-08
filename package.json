@@ -90,7 +90,10 @@
       "McpCatalogPage": "./components/McpCatalogPage",
       "McpServerPage": "./components/McpServerPage",
       "McpToolPage": "./components/McpToolPage",
-      "McpWorkloadPage": "./components/McpWorkloadPage"
+      "McpWorkloadPage": "./components/McpWorkloadPage",
+      "GuardrailsPage": "./components/GuardrailsPage",
+      "GuardrailCreatePage": "./components/GuardrailCreatePage",
+      "GuardrailEditPage": "./components/GuardrailEditPage"
     },
     "dependencies": {
       "@console/pluginAPI": "*"

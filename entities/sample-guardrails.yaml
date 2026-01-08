@@ -1,0 +1,56 @@
+# Sample MCP Guardrails
+# These are database-only entities that can be imported via the UI or API
+# Use: POST /api/mcp-entity-api/guardrails/import with Content-Type: text/yaml
+
+---
+metadata:
+  name: rate-limiter
+  namespace: default
+  description: Limits API calls to prevent abuse and ensure fair usage across workloads
+spec:
+  deployment: sidecar-container
+  parameters: |
+    maxCalls: 100
+    window: 1m
+    action: reject
+
+---
+metadata:
+  name: content-filter
+  namespace: default
+  description: Filters sensitive content from tool inputs and outputs
+spec:
+  deployment: inline-middleware
+  parameters: |
+    patterns:
+      - type: pii
+        action: redact
+      - type: secrets
+        action: block
+    logViolations: true
+
+---
+metadata:
+  name: audit-logger
+  namespace: default
+  description: Logs all tool invocations for compliance and debugging
+spec:
+  deployment: webhook-service
+  parameters: |
+    endpoint: https://audit.example.com/log
+    includePayload: false
+    includeMetadata: true
+    retryCount: 3
+
+---
+metadata:
+  name: cost-tracker
+  namespace: default
+  description: Tracks and limits costs associated with external API calls
+spec:
+  deployment: sidecar-container
+  parameters: |
+    budgetPerHour: 10.00
+    currency: USD
+    alertThreshold: 0.8
+    hardLimit: true

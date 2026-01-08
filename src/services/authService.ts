@@ -6,6 +6,11 @@
 import { useState, useEffect } from 'react';
 
 /**
+ * MCP Entity API proxy endpoint for permission checks.
+ */
+const MCP_ENTITY_API_ENDPOINT = '/api/proxy/plugin/mcp-catalog/backstage/api/mcp-entity-api';
+
+/**
  * Authorization state for catalog edit operations.
  */
 export interface CatalogAuthorizationState {
@@ -18,12 +23,31 @@ export interface CatalogAuthorizationState {
 }
 
 /**
- * Hook to check if the current user can edit catalog entities.
- * 
- * In production, this would integrate with OpenShift Console SDK's
- * useAccessReview to check for appropriate RBAC permissions.
- * 
- * For now, returns true for development/demo purposes.
+ * Check permission for a specific entity type by calling the backend API.
+ *
+ * @param entityType - The MCP entity type to check (mcp-server, mcp-tool, mcp-workload, mcp-guardrail)
+ * @returns Promise resolving to whether user can edit this entity type
+ */
+const checkEditPermission = async (entityType: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`${MCP_ENTITY_API_ENDPOINT}/auth/can-edit/${entityType}`, {
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      // If endpoint fails, fail open for UX but backend will still enforce
+      return true;
+    }
+    const data = await response.json();
+    return data.canEdit === true;
+  } catch {
+    // If request fails, fail open for UX but backend will still enforce
+    return true;
+  }
+};
+
+/**
+ * Hook to check if the current user can edit catalog entities (servers/tools).
+ * Requires mcp-admin role for server/tool CRUD operations.
  */
 export const useCanEditCatalog = (): CatalogAuthorizationState => {
   const [state, setState] = useState<CatalogAuthorizationState>({
@@ -32,15 +56,8 @@ export const useCanEditCatalog = (): CatalogAuthorizationState => {
   });
 
   useEffect(() => {
-    // In a production environment, this would use:
-    // - useAccessReview from @openshift-console/dynamic-plugin-sdk
-    // - Check for specific RBAC permissions
-    // 
-    // For demo purposes, we allow all users to edit
-    setState({
-      canEdit: true,
-      loaded: true,
-      userName: 'current-user',
+    checkEditPermission('mcp-server').then((canEdit) => {
+      setState({ canEdit, loaded: true });
     });
   }, []);
 
@@ -50,11 +67,6 @@ export const useCanEditCatalog = (): CatalogAuthorizationState => {
 /**
  * Hook to check if the current user can edit workloads.
  * Requires mcp-user role for workload CRUD operations.
- * 
- * In production, this would integrate with OpenShift Console SDK's
- * useAccessReview to check for mcp-user RBAC permissions.
- * 
- * For now, returns true for development/demo purposes.
  */
 export const useCanEditWorkloads = (): CatalogAuthorizationState => {
   const [state, setState] = useState<CatalogAuthorizationState>({
@@ -63,15 +75,27 @@ export const useCanEditWorkloads = (): CatalogAuthorizationState => {
   });
 
   useEffect(() => {
-    // In a production environment, this would use:
-    // - useAccessReview from @openshift-console/dynamic-plugin-sdk
-    // - Check for mcp-user RBAC permissions
-    // 
-    // For demo purposes, we allow all users to edit workloads
-    setState({
-      canEdit: true,
-      loaded: true,
-      userName: 'current-user',
+    checkEditPermission('mcp-workload').then((canEdit) => {
+      setState({ canEdit, loaded: true });
+    });
+  }, []);
+
+  return state;
+};
+
+/**
+ * Hook to check if the current user can edit guardrails.
+ * Requires mcp-admin role for guardrail CRUD operations.
+ */
+export const useCanEditGuardrails = (): CatalogAuthorizationState => {
+  const [state, setState] = useState<CatalogAuthorizationState>({
+    canEdit: false,
+    loaded: false,
+  });
+
+  useEffect(() => {
+    checkEditPermission('mcp-guardrail').then((canEdit) => {
+      setState({ canEdit, loaded: true });
     });
   }, []);
 

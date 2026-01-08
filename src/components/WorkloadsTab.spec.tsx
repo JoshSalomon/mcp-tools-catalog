@@ -11,6 +11,11 @@ jest.mock('../services/catalogService', () => ({
   useCatalogEntities: jest.fn(),
 }));
 
+// Mock the authService
+jest.mock('../services/authService', () => ({
+  useCanEditWorkloads: jest.fn(() => ({ canEdit: false, loaded: true })),
+}));
+
 // Mock the performanceMonitor
 jest.mock('../utils/performanceMonitor', () => ({
   usePerformanceMonitor: jest.fn(() => jest.fn()),
@@ -99,11 +104,7 @@ const mockTools: CatalogMcpTool[] = [
 ];
 
 const renderWithRouter = (component: React.ReactElement) => {
-  return render(
-    <MemoryRouter>
-      {component}
-    </MemoryRouter>
-  );
+  return render(<MemoryRouter>{component}</MemoryRouter>);
 };
 
 // Helper to setup mocks for both workloads and tools
@@ -112,7 +113,7 @@ const setupMocks = (
   workloadsLoaded = true,
   workloadsError: Error | null = null,
   tools: CatalogMcpTool[] = mockTools,
-  toolsLoaded = true
+  toolsLoaded = true,
 ) => {
   mockUseCatalogEntities.mockImplementation((_kind, type) => {
     // Second parameter distinguishes workloads (undefined) from tools ('mcp-tool')
@@ -228,7 +229,10 @@ describe('WorkloadsTab', () => {
     renderWithRouter(<WorkloadsTab />);
 
     const searchInput = screen.getByPlaceholderText('Find workload by name...');
-    expect(searchInput).toHaveAttribute('aria-label', 'Search MCP workloads by name or description');
+    expect(searchInput).toHaveAttribute(
+      'aria-label',
+      'Search MCP workloads by name or description',
+    );
   });
 
   it('renders table with correct headers', () => {
@@ -237,8 +241,8 @@ describe('WorkloadsTab', () => {
     renderWithRouter(<WorkloadsTab />);
 
     const headers = screen.getAllByRole('columnheader');
-    const headerTexts = headers.map(h => h.textContent);
-    
+    const headerTexts = headers.map((h) => h.textContent);
+
     expect(headerTexts).toContain('Name');
     expect(headerTexts).toContain('Namespace');
     expect(headerTexts).toContain('Type');
@@ -283,7 +287,7 @@ describe('WorkloadsTab', () => {
     // Should show workloads with valid types
     expect(screen.getByText('cicd-pipeline')).toBeInTheDocument();
     expect(screen.getByText('legacy-service')).toBeInTheDocument();
-    
+
     // Should not show library type
     expect(screen.queryByText('non-workload')).not.toBeInTheDocument();
   });

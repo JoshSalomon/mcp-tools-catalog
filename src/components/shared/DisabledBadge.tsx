@@ -18,10 +18,7 @@ interface DisabledBadgeProps {
  * A read-only badge component that indicates whether a tool is disabled.
  * Only shows a badge when the tool is disabled.
  */
-export const DisabledBadge: React.FC<DisabledBadgeProps> = ({
-  isDisabled,
-  toolName,
-}) => {
+export const DisabledBadge: React.FC<DisabledBadgeProps> = ({ isDisabled, toolName }) => {
   if (!isDisabled) {
     return null;
   }

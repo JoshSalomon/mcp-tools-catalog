@@ -95,16 +95,19 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
 
   // Build server/tool tree data
   const treeData = React.useMemo((): TreeViewDataItem[] => {
-    const serverNodes: TreeViewDataItem[] = servers.map(server => {
+    const serverNodes: TreeViewDataItem[] = servers.map((server) => {
       const serverTools = filterToolsByServer(tools, server.metadata.name);
-      const toolNodes: TreeViewDataItem[] = serverTools.map(tool => {
+      const toolNodes: TreeViewDataItem[] = serverTools.map((tool) => {
         const toolRef = `component:${tool.metadata.namespace || 'default'}/${tool.metadata.name}`;
         const isSelected = formState.formData.selectedTools.has(toolRef);
         const isDisabled = isToolDisabled(tool);
 
         return {
           name: (
-            <Flex alignItems={{ default: 'alignItemsCenter' }} spaceItems={{ default: 'spaceItemsSm' }}>
+            <Flex
+              alignItems={{ default: 'alignItemsCenter' }}
+              spaceItems={{ default: 'spaceItemsSm' }}
+            >
               <FlexItem>
                 <Checkbox
                   id={`tool-${tool.metadata.name}`}
@@ -121,7 +124,9 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
               </FlexItem>
               {isDisabled && (
                 <FlexItem>
-                  <Label color="orange" isCompact>Disabled</Label>
+                  <Label color="orange" isCompact>
+                    Disabled
+                  </Label>
                 </FlexItem>
               )}
             </Flex>
@@ -147,7 +152,7 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
   const handleToggle = React.useCallback((_event: React.MouseEvent, item: TreeViewDataItem) => {
     if (item.id && item.id.startsWith('server-')) {
       const serverName = item.id.replace('server-', '');
-      setExpandedServers(prev => {
+      setExpandedServers((prev) => {
         const updated = new Set(prev);
         if (updated.has(serverName)) {
           updated.delete(serverName);
@@ -192,7 +197,11 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
           variant="danger"
           title="Failed to save workload"
           isInline
-          actionClose={<Button variant="plain" onClick={() => setSaveError(null)}>×</Button>}
+          actionClose={
+            <Button variant="plain" onClick={() => setSaveError(null)}>
+              ×
+            </Button>
+          }
           style={{ marginBottom: '1rem' }}
         >
           {saveError.message}
@@ -206,11 +215,7 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
             Workload Metadata
           </Title>
 
-          <FormGroup
-            label="Name"
-            isRequired
-            fieldId="workload-name"
-          >
+          <FormGroup label="Name" isRequired fieldId="workload-name">
             <TextInput
               id="workload-name"
               value={formState.formData.name}
@@ -231,11 +236,7 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
             )}
           </FormGroup>
 
-          <FormGroup
-            label="Namespace"
-            isRequired
-            fieldId="workload-namespace"
-          >
+          <FormGroup label="Namespace" isRequired fieldId="workload-namespace">
             <TextInput
               id="workload-namespace"
               value={formState.formData.namespace}
@@ -314,17 +315,15 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
 
           {formState.formData.selectedTools.size > 0 && (
             <div style={{ marginTop: '1rem', fontSize: '0.875rem', color: '#6a6e73' }}>
-              {formState.formData.selectedTools.size} tool{formState.formData.selectedTools.size !== 1 ? 's' : ''} selected
+              {formState.formData.selectedTools.size} tool
+              {formState.formData.selectedTools.size !== 1 ? 's' : ''} selected
             </div>
           )}
         </CardBody>
       </Card>
 
       {/* Save/Cancel buttons */}
-      <Flex
-        alignItems={{ default: 'alignItemsCenter' }}
-        spaceItems={{ default: 'spaceItemsMd' }}
-      >
+      <Flex alignItems={{ default: 'alignItemsCenter' }} spaceItems={{ default: 'spaceItemsMd' }}>
         <FlexItem>
           <Button
             variant="primary"
@@ -348,9 +347,7 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
         </FlexItem>
         {formState.hasChanges && (
           <FlexItem>
-            <span style={{ fontSize: '0.875rem', color: '#6a6e73' }}>
-              Unsaved changes
-            </span>
+            <span style={{ fontSize: '0.875rem', color: '#6a6e73' }}>Unsaved changes</span>
           </FlexItem>
         )}
       </Flex>

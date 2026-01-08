@@ -11,16 +11,20 @@ import { CatalogMcpServer } from '../models/CatalogMcpServer';
 jest.mock('../services/catalogService', () => ({
   useCatalogEntity: jest.fn(),
   useCatalogEntities: jest.fn(),
+  useGuardrails: jest.fn(() => [[], true, null]),
+  useWorkloadToolGuardrails: jest.fn(() => [[], true, null]),
+  addGuardrailToWorkloadTool: jest.fn(),
+  removeGuardrailFromWorkloadTool: jest.fn(),
+}));
+
+// Mock the authService
+jest.mock('../services/authService', () => ({
+  useCanEditCatalog: jest.fn(() => ({ canEdit: false, loaded: true })),
 }));
 
 // Mock the performanceMonitor
 jest.mock('../utils/performanceMonitor', () => ({
   usePerformanceMonitor: jest.fn(() => jest.fn()),
-}));
-
-// Mock the DependencyTreeView to simplify testing
-jest.mock('./shared/DependencyTreeView', () => ({
-  DependencyTreeView: () => <div data-testid="dependency-tree">Mocked DependencyTreeView</div>,
 }));
 
 const mockUseCatalogEntity = useCatalogEntity as jest.MockedFunction<typeof useCatalogEntity>;
@@ -115,7 +119,7 @@ const setupMocks = (
   tools: CatalogMcpTool[] = mockTools,
   toolsLoaded = true,
   servers: CatalogMcpServer[] = mockServers,
-  serversLoaded = true
+  serversLoaded = true,
 ) => {
   mockUseCatalogEntity.mockReturnValue([workload, workloadLoaded, workloadError]);
   mockUseCatalogEntities.mockImplementation((_kind, type) => {
@@ -135,7 +139,7 @@ const renderWithRouter = (initialPath: string) => {
       <Route path="/mcp-catalog/workloads/:name">
         <McpWorkloadPage />
       </Route>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 };
 
@@ -272,21 +276,13 @@ describe('McpWorkloadPage', () => {
     expect(screen.getByText('Workloads')).toBeInTheDocument();
   });
 
-  it('renders DependencyTreeView component', () => {
+  it('shows Server Details button for existing servers', () => {
     setupMocks();
 
     renderWithRouter('/mcp-catalog/workloads/cicd-pipeline');
 
-    expect(screen.getByText('Dependency Tree')).toBeInTheDocument();
-    expect(screen.getByTestId('dependency-tree')).toBeInTheDocument();
-  });
-
-  it('shows View Server Details link for existing servers', () => {
-    setupMocks();
-
-    renderWithRouter('/mcp-catalog/workloads/cicd-pipeline');
-
-    const serverLinks = screen.getAllByText('View Server Details →');
-    expect(serverLinks.length).toBeGreaterThan(0);
+    // The UI now shows "Details" buttons for each server group
+    const detailsButtons = screen.getAllByRole('button', { name: 'Details' });
+    expect(detailsButtons.length).toBeGreaterThan(0);
   });
 });

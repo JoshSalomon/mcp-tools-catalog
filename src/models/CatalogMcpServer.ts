@@ -14,9 +14,9 @@ export const CATALOG_MCP_SERVER_TYPE = 'mcp-server';
 /**
  * MCP Server entity interface.
  * Represents an MCP (Model Context Protocol) server in the Backstage Catalog.
- * 
+ *
  * @extends Entity - Backstage base entity type
- * 
+ *
  * @example
  * ```yaml
  * apiVersion: backstage.io/v1alpha1

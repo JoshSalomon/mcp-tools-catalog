@@ -1,6 +1,22 @@
 # mcp-tools-catalog Development Guidelines
 
-Last updated: 2025-12-30
+Last updated: 2026-01-08
+
+## CRITICAL: User Verification Required (Principle XI)
+
+**STOP before implementing any fix for a user-reported problem.**
+
+When the user identifies a problem:
+1. Explain the root cause
+2. Propose the solution
+3. **WAIT for user approval before making changes**
+
+Only proceed after explicit confirmation ("yes", "go ahead", "do it", etc.).
+
+This rule does NOT apply when:
+- User gives explicit instructions ("add X to file Y")
+- User asks for research/exploration only
+- User explicitly says to proceed without verification
 
 ## Active Technologies
 - TypeScript 4.7+, Node.js 18+
@@ -12,6 +28,7 @@ Last updated: 2025-12-30
 - Backstage catalog backend (existing) - no additional storage required
 - TypeScript 4.7+ (strict mode), Node.js 18+ + Express (Backstage backend), React 17.x (frontend), PatternFly 6.2+, @backstage/catalog-model ^1.7.5 (005-workload-local-db)
 - SQLite 3.x (existing mcp-entity-api database) (005-workload-local-db)
+- TypeScript 4.7+ (strict mode), Node.js 18+ + @backstage/catalog-model ^1.7.5, Express (Backstage backend), React 17.x + PatternFly 6.2+ (frontend) (006-mcp-guardrails)
 
 ## Project Structure
 
@@ -181,4 +198,5 @@ The project follows a constitution (`.specify/memory/constitution.md` v1.5.0). K
 - [DOCUMENTATION-INDEX.md](./DOCUMENTATION-INDEX.md) - Complete documentation index
 
 ## Recent Changes
+- 006-mcp-guardrails: Added TypeScript 4.7+ (strict mode), Node.js 18+ + @backstage/catalog-model ^1.7.5, Express (Backstage backend), React 17.x + PatternFly 6.2+ (frontend)
 - 005-workload-local-db: Added TypeScript 4.7+ (strict mode), Node.js 18+ + Express (Backstage backend), React 17.x (frontend), PatternFly 6.2+, @backstage/catalog-model ^1.7.5

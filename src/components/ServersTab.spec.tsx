@@ -56,11 +56,7 @@ const mockServers: CatalogMcpServer[] = [
 ];
 
 const renderWithRouter = (component: React.ReactElement) => {
-  return render(
-    <MemoryRouter>
-      {component}
-    </MemoryRouter>
-  );
+  return render(<MemoryRouter>{component}</MemoryRouter>);
 };
 
 describe('ServersTab', () => {

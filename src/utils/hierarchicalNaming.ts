@@ -2,7 +2,9 @@ export const formatToolName = (serverName: string, toolName: string): string => 
   return `${serverName}/${toolName}`;
 };
 
-export const parseToolName = (fullToolName: string): { serverName: string; toolName: string } | null => {
+export const parseToolName = (
+  fullToolName: string,
+): { serverName: string; toolName: string } | null => {
   const parts = fullToolName.split('/');
   if (parts.length !== 2) return null;
   return { serverName: parts[0], toolName: parts[1] };

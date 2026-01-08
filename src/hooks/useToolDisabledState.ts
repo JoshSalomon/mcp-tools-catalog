@@ -3,7 +3,11 @@
  */
 
 import { useState, useCallback } from 'react';
-import { CatalogMcpTool, MCP_TOOL_DISABLED_ANNOTATION, isToolDisabled } from '../models/CatalogMcpTool';
+import {
+  CatalogMcpTool,
+  MCP_TOOL_DISABLED_ANNOTATION,
+  isToolDisabled,
+} from '../models/CatalogMcpTool';
 import { updateEntityAnnotation } from '../services/catalogService';
 
 /**
@@ -34,14 +38,14 @@ export interface ToolDisabledState {
 
 /**
  * Hook to manage the disabled state of a tool with optimistic updates.
- * 
+ *
  * @param tool - The tool entity to manage
  * @param onUpdate - Optional callback when the tool is updated
  * @returns State and actions for managing disabled state
  */
 export const useToolDisabledState = (
   tool: CatalogMcpTool,
-  onUpdate?: (updatedTool: CatalogMcpTool) => void
+  onUpdate?: (updatedTool: CatalogMcpTool) => void,
 ): ToolDisabledState => {
   const [isDisabled, setIsDisabled] = useState(() => isToolDisabled(tool));
   const [isUpdating, setIsUpdating] = useState(false);
@@ -50,39 +54,42 @@ export const useToolDisabledState = (
 
   const entityRef = `component:${tool.metadata.namespace || 'default'}/${tool.metadata.name}`;
 
-  const performUpdate = useCallback(async (newDisabledState: boolean) => {
-    const previousState = isDisabled;
-    
-    // Optimistic update
-    setIsDisabled(newDisabledState);
-    setIsUpdating(true);
-    setError(null);
-    setPendingState(newDisabledState);
+  const performUpdate = useCallback(
+    async (newDisabledState: boolean) => {
+      const previousState = isDisabled;
 
-    try {
-      const updatedTool = await updateEntityAnnotation<CatalogMcpTool>(
-        entityRef,
-        MCP_TOOL_DISABLED_ANNOTATION,
-        newDisabledState ? 'true' : null
-      );
+      // Optimistic update
+      setIsDisabled(newDisabledState);
+      setIsUpdating(true);
+      setError(null);
+      setPendingState(newDisabledState);
 
-      // Success - notify parent
-      if (onUpdate) {
-        onUpdate(updatedTool);
+      try {
+        const updatedTool = await updateEntityAnnotation<CatalogMcpTool>(
+          entityRef,
+          MCP_TOOL_DISABLED_ANNOTATION,
+          newDisabledState ? 'true' : null,
+        );
+
+        // Success - notify parent
+        if (onUpdate) {
+          onUpdate(updatedTool);
+        }
+        setPendingState(null);
+      } catch (err) {
+        // Rollback on error
+        setIsDisabled(previousState);
+        setError({
+          message: err instanceof Error ? err.message : 'Failed to update tool state',
+          originalState: previousState,
+        });
+        setPendingState(null);
+      } finally {
+        setIsUpdating(false);
       }
-      setPendingState(null);
-    } catch (err) {
-      // Rollback on error
-      setIsDisabled(previousState);
-      setError({
-        message: err instanceof Error ? err.message : 'Failed to update tool state',
-        originalState: previousState,
-      });
-      setPendingState(null);
-    } finally {
-      setIsUpdating(false);
-    }
-  }, [entityRef, isDisabled, onUpdate]);
+    },
+    [entityRef, isDisabled, onUpdate],
+  );
 
   const toggle = useCallback(async () => {
     await performUpdate(!isDisabled);

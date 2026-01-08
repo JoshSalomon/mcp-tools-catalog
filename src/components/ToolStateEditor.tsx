@@ -25,7 +25,7 @@ interface ToolStateEditorProps {
 /**
  * Component for batch editing tool states with Save/Cancel buttons.
  * Buttons are disabled by default and enabled when changes are detected.
- * 
+ *
  * This component provides the Save/Cancel UI and state management.
  * The parent component should render the actual tool checkboxes using
  * the batch state management functions.
@@ -59,7 +59,11 @@ export const ToolStateEditor: React.FC<ToolStateEditorProps> = ({
           variant="danger"
           title="Failed to save tool state changes"
           isInline
-          actionClose={<Button variant="plain" onClick={batchState.clearError}>×</Button>}
+          actionClose={
+            <Button variant="plain" onClick={batchState.clearError}>
+              ×
+            </Button>
+          }
         >
           {batchState.error.message}
         </Alert>
@@ -97,7 +101,8 @@ export const ToolStateEditor: React.FC<ToolStateEditorProps> = ({
         {hasPendingChanges && (
           <FlexItem>
             <span style={{ fontSize: '0.875rem', color: '#6a6e73' }}>
-              {batchState.pendingChanges.size} change{batchState.pendingChanges.size !== 1 ? 's' : ''} pending
+              {batchState.pendingChanges.size} change
+              {batchState.pendingChanges.size !== 1 ? 's' : ''} pending
             </span>
           </FlexItem>
         )}
@@ -112,7 +117,7 @@ export const ToolStateEditor: React.FC<ToolStateEditorProps> = ({
  */
 export const useToolStateEditor = (
   tools: CatalogMcpTool[],
-  onSaveComplete?: (updatedTools: CatalogMcpTool[]) => void
+  onSaveComplete?: (updatedTools: CatalogMcpTool[]) => void,
 ): BatchToolState => {
   return useBatchToolState(tools, onSaveComplete);
 };

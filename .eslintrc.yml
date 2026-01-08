@@ -22,3 +22,19 @@ rules:
 settings:
   react:
     version: detect
+ignorePatterns:
+  - 'src/**/*.js'
+  - '!src/**/*.spec.js'
+overrides:
+  - files:
+      - '**/*.spec.js'
+      - '**/*.spec.ts'
+      - '**/*.spec.tsx'
+      - '**/*.test.js'
+      - '**/*.test.ts'
+      - '**/*.test.tsx'
+    env:
+      jest: true
+      node: true
+    rules:
+      react/prop-types: off

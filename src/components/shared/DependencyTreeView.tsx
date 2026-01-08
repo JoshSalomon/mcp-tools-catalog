@@ -61,21 +61,21 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
   // Get tool references from workload
   const getToolRefs = (workload: CatalogMcpWorkload): string[] => {
     const refs: string[] = [];
-    
+
     if (workload.spec.consumes) {
       refs.push(...workload.spec.consumes);
     }
-    
+
     if ((workload.spec as any).mcp?.tools) {
       refs.push(...(workload.spec as any).mcp.tools);
     }
-    
+
     if (workload.relations) {
       workload.relations
-        .filter(rel => rel.type === 'consumesApi' || rel.type === 'dependsOn')
-        .forEach(rel => refs.push(rel.targetRef));
+        .filter((rel) => rel.type === 'consumesApi' || rel.type === 'dependsOn')
+        .forEach((rel) => refs.push(rel.targetRef));
     }
-    
+
     return [...new Set(refs)];
   };
 
@@ -83,12 +83,12 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
   // Priority: subcomponentOf > partOf > relations array > label
   const getToolServerName = (tool: CatalogMcpTool | null): string | null => {
     if (!tool) return null;
-    
+
     // Check spec.subcomponentOf first (Component to Component relation)
     if (tool.spec.subcomponentOf) {
       return getEntityName(tool.spec.subcomponentOf);
     }
-    
+
     // Check spec.partOf (Component to System, but might be used)
     if (tool.spec.partOf) {
       const partOf = Array.isArray(tool.spec.partOf) ? tool.spec.partOf[0] : tool.spec.partOf;
@@ -96,40 +96,40 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
         return getEntityName(partOf);
       }
     }
-    
+
     // Check relations array for partOf type (generated from subcomponentOf)
     if (tool.relations) {
-      const partOfRelation = tool.relations.find(rel => rel.type === 'partOf');
+      const partOfRelation = tool.relations.find((rel) => rel.type === 'partOf');
       if (partOfRelation?.targetRef) {
         return getEntityName(partOfRelation.targetRef);
       }
     }
-    
+
     // Fallback to spec.mcp.server (legacy)
     if (tool.spec.mcp?.server) {
       return getEntityName(tool.spec.mcp.server);
     }
-    
+
     // Fallback to label
     return tool.metadata.labels?.['mcp-catalog.io/server'] || null;
   };
 
   // Find tool entity by name
   const findTool = (toolName: string): CatalogMcpTool | null => {
-    return tools.find(t => t.metadata.name === toolName) || null;
+    return tools.find((t) => t.metadata.name === toolName) || null;
   };
 
   // Find server entity by name
   const findServer = (serverName: string): CatalogMcpServer | null => {
-    return servers.find(s => s.metadata.name === serverName) || null;
+    return servers.find((s) => s.metadata.name === serverName) || null;
   };
 
   // Handle node click for navigation
   const handleNodeClick = (nodeData: TreeNodeData) => {
     if (!nodeData.exists) return;
-    
+
     const ns = nodeData.namespace || namespace;
-    
+
     switch (nodeData.type) {
       case 'workload':
         history.push(`/mcp-catalog/workloads/${nodeData.name}?namespace=${ns}`);
@@ -146,15 +146,16 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
   // Build tree data structure
   const buildTreeData = React.useCallback((): TreeViewDataItem[] => {
     const toolRefs = getToolRefs(workload);
-    
+
     // Group tools by server
-    const serverToolMap: Map<string, { tool: CatalogMcpTool | null; toolName: string }[]> = new Map();
-    
-    toolRefs.forEach(ref => {
+    const serverToolMap: Map<string, { tool: CatalogMcpTool | null; toolName: string }[]> =
+      new Map();
+
+    toolRefs.forEach((ref) => {
       const toolName = getEntityName(ref);
       const tool = findTool(toolName);
-      const serverName = tool ? (getToolServerName(tool) || 'Unknown Server') : 'Unknown Server';
-      
+      const serverName = tool ? getToolServerName(tool) || 'Unknown Server' : 'Unknown Server';
+
       if (!serverToolMap.has(serverName)) {
         serverToolMap.set(serverName, []);
       }
@@ -162,33 +163,73 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
     });
 
     // Build server nodes with tool children
-    const serverNodes: TreeViewDataItem[] = Array.from(serverToolMap.entries()).map(([serverName, toolInfos]) => {
-      const serverEntity = findServer(serverName);
-      const serverExists = !!serverEntity;
-      
-      const toolChildren: TreeViewDataItem[] = toolInfos.map(({ tool, toolName }) => {
-        const toolExists = !!tool;
-        const toolNodeData: TreeNodeData = {
-          type: 'tool',
-          name: toolName,
-          namespace: tool?.metadata.namespace || namespace,
-          exists: toolExists,
+    const serverNodes: TreeViewDataItem[] = Array.from(serverToolMap.entries()).map(
+      ([serverName, toolInfos]) => {
+        const serverEntity = findServer(serverName);
+        const serverExists = !!serverEntity;
+
+        const toolChildren: TreeViewDataItem[] = toolInfos.map(({ tool, toolName }) => {
+          const toolExists = !!tool;
+          const toolNodeData: TreeNodeData = {
+            type: 'tool',
+            name: toolName,
+            namespace: tool?.metadata.namespace || namespace,
+            exists: toolExists,
+          };
+
+          return {
+            name: toolName,
+            id: `tool-${toolName}`,
+            icon: <WrenchIcon />,
+            customBadgeContent: !toolExists ? (
+              <Label color="red" isCompact>
+                Not Found
+              </Label>
+            ) : undefined,
+            action: toolExists ? (
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleNodeClick(toolNodeData);
+                }}
+                style={{ fontSize: '0.75rem' }}
+              >
+                View →
+              </a>
+            ) : undefined,
+          };
+        });
+
+        const serverNodeData: TreeNodeData = {
+          type: 'server',
+          name: serverName,
+          namespace: serverEntity?.metadata.namespace || namespace,
+          exists: serverExists,
         };
-        
+
         return {
-          name: toolName,
-          id: `tool-${toolName}`,
-          icon: <WrenchIcon />,
-          customBadgeContent: !toolExists ? (
-            <Label color="red" isCompact>Not Found</Label>
-          ) : undefined,
-          action: toolExists ? (
+          name: serverName,
+          id: `server-${serverName}`,
+          icon: <ServerIcon />,
+          children: toolChildren,
+          defaultExpanded: true,
+          customBadgeContent:
+            !serverExists && serverName !== 'Unknown Server' ? (
+              <Label color="orange" isCompact>
+                Not Found
+              </Label>
+            ) : (
+              <Label isCompact>{toolChildren.length}</Label>
+            ),
+          action: serverExists ? (
             <a
               href="#"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                handleNodeClick(toolNodeData);
+                handleNodeClick(serverNodeData);
               }}
               style={{ fontSize: '0.75rem' }}
             >
@@ -196,41 +237,8 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
             </a>
           ) : undefined,
         };
-      });
-
-      const serverNodeData: TreeNodeData = {
-        type: 'server',
-        name: serverName,
-        namespace: serverEntity?.metadata.namespace || namespace,
-        exists: serverExists,
-      };
-
-      return {
-        name: serverName,
-        id: `server-${serverName}`,
-        icon: <ServerIcon />,
-        children: toolChildren,
-        defaultExpanded: true,
-        customBadgeContent: !serverExists && serverName !== 'Unknown Server' ? (
-          <Label color="orange" isCompact>Not Found</Label>
-        ) : (
-          <Label isCompact>{toolChildren.length}</Label>
-        ),
-        action: serverExists ? (
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleNodeClick(serverNodeData);
-            }}
-            style={{ fontSize: '0.75rem' }}
-          >
-            View →
-          </a>
-        ) : undefined,
-      };
-    });
+      },
+    );
 
     // Build workload root node
     const workloadNodeData: TreeNodeData = {
@@ -246,7 +254,11 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
       icon: <CubeIcon />,
       children: serverNodes,
       defaultExpanded: true,
-      customBadgeContent: <Label color="blue" isCompact>{workload.spec.type}</Label>,
+      customBadgeContent: (
+        <Label color="blue" isCompact>
+          {workload.spec.type}
+        </Label>
+      ),
       action: (
         <a
           href="#"
@@ -266,39 +278,42 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
   }, [workload, tools, servers, namespace, history]);
 
   // Filter tree by search term
-  const filterTree = React.useCallback((items: TreeViewDataItem[], term: string): TreeViewDataItem[] => {
-    if (!term) return items;
-    
-    const lowerTerm = term.toLowerCase();
-    
-    const filterNode = (node: TreeViewDataItem): TreeViewDataItem | null => {
-      // node.name can be ReactNode, so convert to string safely
-      const nodeName = typeof node.name === 'string' ? node.name : String(node.name || '');
-      const nameMatches = nodeName.toLowerCase().includes(lowerTerm);
-      
-      // Filter children recursively
-      const filteredChildren = node.children
-        ? node.children
-            .map(child => filterNode(child))
-            .filter((child): child is TreeViewDataItem => child !== null)
-        : undefined;
-      
-      // Include node if name matches or has matching children
-      if (nameMatches || (filteredChildren && filteredChildren.length > 0)) {
-        return {
-          ...node,
-          children: filteredChildren,
-          defaultExpanded: true,
-        };
-      }
-      
-      return null;
-    };
-    
-    return items
-      .map(item => filterNode(item))
-      .filter((item): item is TreeViewDataItem => item !== null);
-  }, []);
+  const filterTree = React.useCallback(
+    (items: TreeViewDataItem[], term: string): TreeViewDataItem[] => {
+      if (!term) return items;
+
+      const lowerTerm = term.toLowerCase();
+
+      const filterNode = (node: TreeViewDataItem): TreeViewDataItem | null => {
+        // node.name can be ReactNode, so convert to string safely
+        const nodeName = typeof node.name === 'string' ? node.name : String(node.name || '');
+        const nameMatches = nodeName.toLowerCase().includes(lowerTerm);
+
+        // Filter children recursively
+        const filteredChildren = node.children
+          ? node.children
+              .map((child) => filterNode(child))
+              .filter((child): child is TreeViewDataItem => child !== null)
+          : undefined;
+
+        // Include node if name matches or has matching children
+        if (nameMatches || (filteredChildren && filteredChildren.length > 0)) {
+          return {
+            ...node,
+            children: filteredChildren,
+            defaultExpanded: true,
+          };
+        }
+
+        return null;
+      };
+
+      return items
+        .map((item) => filterNode(item))
+        .filter((item): item is TreeViewDataItem => item !== null);
+    },
+    [],
+  );
 
   // Update filtered items when search term or data changes
   React.useEffect(() => {
@@ -314,9 +329,7 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
         <Title headingLevel="h4" size="md">
           No Dependencies
         </Title>
-        <EmptyStateBody>
-          This workload does not have any tool dependencies.
-        </EmptyStateBody>
+        <EmptyStateBody>This workload does not have any tool dependencies.</EmptyStateBody>
       </EmptyState>
     );
   }
@@ -336,13 +349,14 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
             />
           </ToolbarItem>
           <ToolbarItem>
-            <span 
-              style={{ color: '#666', fontSize: '0.875rem' }}
-              role="status"
-              aria-live="polite"
-            >
+            <span style={{ color: '#666', fontSize: '0.875rem' }} role="status" aria-live="polite">
               {searchTerm && filteredItems[0]?.children?.length !== undefined
-                ? `Showing ${filteredItems[0]?.children?.reduce((acc, s) => acc + (s.children?.length || 0), 0) || 0} tools`
+                ? `Showing ${
+                    filteredItems[0]?.children?.reduce(
+                      (acc, s) => acc + (s.children?.length || 0),
+                      0,
+                    ) || 0
+                  } tools`
                 : `${toolRefs.length} total dependencies`}
             </span>
           </ToolbarItem>
@@ -354,9 +368,7 @@ export const DependencyTreeView: React.FC<DependencyTreeViewProps> = ({
           <Title headingLevel="h4" size="md">
             No matches found
           </Title>
-          <EmptyStateBody>
-            No dependencies match "{searchTerm}".
-          </EmptyStateBody>
+          <EmptyStateBody>No dependencies match &quot;{searchTerm}&quot;.</EmptyStateBody>
         </EmptyState>
       ) : (
         <TreeView

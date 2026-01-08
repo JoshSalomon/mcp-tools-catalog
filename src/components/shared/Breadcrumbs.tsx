@@ -1,9 +1,6 @@
 import * as React from 'react';
 import { useHistory } from 'react-router-dom';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-} from '@patternfly/react-core';
+import { Breadcrumb, BreadcrumbItem } from '@patternfly/react-core';
 
 /**
  * Breadcrumb item definition
@@ -26,7 +23,7 @@ interface BreadcrumbsProps {
 /**
  * Breadcrumbs component for navigation within the MCP Catalog
  * Provides consistent breadcrumb navigation across detail pages.
- * 
+ *
  * @example
  * ```tsx
  * <Breadcrumbs items={[
@@ -51,15 +48,12 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
       <Breadcrumb>
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
-          
+
           return (
-            <BreadcrumbItem
-              key={index}
-              isActive={isLast}
-            >
+            <BreadcrumbItem key={index} isActive={isLast}>
               {item.path && !isLast ? (
-                <a 
-                  href="#" 
+                <a
+                  href="#"
                   onClick={(e) => handleClick(item.path, e)}
                   aria-label={`Navigate to ${item.label}`}
                 >
@@ -80,15 +74,16 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
  * Helper to create standard MCP Catalog breadcrumbs
  */
 export const createMcpCatalogBreadcrumbs = (
-  entityType: 'server' | 'tool' | 'workload',
-  entityName: string
+  entityType: 'server' | 'tool' | 'workload' | 'guardrail',
+  entityName: string,
 ): BreadcrumbItemDef[] => {
   const typeLabels: Record<string, string> = {
     server: 'Servers',
     tool: 'Tools',
     workload: 'Workloads',
+    guardrail: 'Guardrails',
   };
-  
+
   return [
     { label: 'MCP Catalog', path: '/mcp-catalog' },
     { label: typeLabels[entityType], path: `/mcp-catalog?type=${entityType}` },

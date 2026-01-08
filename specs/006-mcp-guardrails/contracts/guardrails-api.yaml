@@ -1,0 +1,665 @@
+openapi: 3.0.3
+info:
+  title: MCP Entity API - Guardrails
+  description: API for managing MCP guardrail entities
+  version: 1.0.0
+
+servers:
+  - url: /api/mcp-entity-api
+    description: Backstage backend API
+
+paths:
+  /guardrails:
+    get:
+      summary: List all guardrails
+      description: Returns a paginated list of all guardrails. No authentication required (public read).
+      tags: [Guardrails]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: namespace
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of guardrails
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuardrailListResponse'
+
+    post:
+      summary: Create a new guardrail
+      description: Creates a new guardrail. Requires mcp-admin role.
+      tags: [Guardrails]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGuardrailInput'
+      responses:
+        '201':
+          description: Guardrail created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guardrail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /guardrails/import:
+    post:
+      summary: Import guardrail from YAML
+      description: Creates a guardrail from uploaded YAML file. Requires mcp-admin role.
+      tags: [Guardrails]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Guardrail imported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guardrail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /guardrails/{namespace}/{name}:
+    parameters:
+      - name: namespace
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+
+    get:
+      summary: Get a guardrail by namespace and name
+      description: Returns a single guardrail with usage information. No authentication required.
+      tags: [Guardrails]
+      responses:
+        '200':
+          description: Guardrail found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuardrailWithUsage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      summary: Update a guardrail
+      description: Updates an existing guardrail. Requires mcp-admin role.
+      tags: [Guardrails]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGuardrailInput'
+      responses:
+        '200':
+          description: Guardrail updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guardrail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+    delete:
+      summary: Delete a guardrail
+      description: Deletes a guardrail. Fails if guardrail has associations. Requires mcp-admin role.
+      tags: [Guardrails]
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Guardrail deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot delete - guardrail has associations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /guardrails/{namespace}/{name}/disable:
+    parameters:
+      - name: namespace
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+
+    post:
+      summary: Disable a guardrail
+      description: Globally disables a guardrail. Requires mcp-admin role.
+      tags: [Guardrails]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Guardrail disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guardrail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Enable a guardrail
+      description: Re-enables a disabled guardrail. Requires mcp-admin role.
+      tags: [Guardrails]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Guardrail enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guardrail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tools/{namespace}/{name}/guardrails:
+    parameters:
+      - name: namespace
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+
+    get:
+      summary: List guardrails attached to a tool
+      description: Returns all guardrails attached to the specified tool. No authentication required.
+      tags: [Tool Guardrails]
+      responses:
+        '200':
+          description: List of tool guardrails
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ToolGuardrailAssociation'
+
+    post:
+      summary: Attach a guardrail to a tool
+      description: Attaches a guardrail to a tool with execution timing. Requires mcp-admin role.
+      tags: [Tool Guardrails]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttachGuardrailInput'
+      responses:
+        '201':
+          description: Guardrail attached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolGuardrailAssociation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /tools/{namespace}/{name}/guardrails/{guardrailNamespace}/{guardrailName}:
+    parameters:
+      - name: namespace
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: guardrailNamespace
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: guardrailName
+        in: path
+        required: true
+        schema:
+          type: string
+
+    delete:
+      summary: Detach a guardrail from a tool
+      description: Removes a guardrail from a tool. Requires mcp-admin role.
+      tags: [Tool Guardrails]
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Guardrail detached
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /workloads/{workloadNamespace}/{workloadName}/tools/{toolNamespace}/{toolName}/guardrails:
+    parameters:
+      - name: workloadNamespace
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workloadName
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: toolNamespace
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: toolName
+        in: path
+        required: true
+        schema:
+          type: string
+
+    get:
+      summary: List guardrails for a workload-tool relationship
+      description: Returns all guardrails (inherited and added) for a workload-tool pair. No authentication required.
+      tags: [Workload Tool Guardrails]
+      responses:
+        '200':
+          description: List of workload-tool guardrails
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WorkloadToolGuardrailAssociation'
+
+    post:
+      summary: Add a guardrail to a workload-tool relationship
+      description: Adds a guardrail at the workload level. Requires mcp-user role.
+      tags: [Workload Tool Guardrails]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttachGuardrailInput'
+      responses:
+        '201':
+          description: Guardrail added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkloadToolGuardrailAssociation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /workloads/{workloadNamespace}/{workloadName}/tools/{toolNamespace}/{toolName}/guardrails/{guardrailNamespace}/{guardrailName}:
+    parameters:
+      - name: workloadNamespace
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workloadName
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: toolNamespace
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: toolName
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: guardrailNamespace
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: guardrailName
+        in: path
+        required: true
+        schema:
+          type: string
+
+    delete:
+      summary: Remove a guardrail from a workload-tool relationship
+      description: Removes a workload-level guardrail. Cannot remove tool-level guardrails. Requires mcp-user role.
+      tags: [Workload Tool Guardrails]
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Guardrail removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Cannot remove tool-level guardrails or insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    Guardrail:
+      type: object
+      required:
+        - metadata
+        - spec
+      properties:
+        metadata:
+          type: object
+          required:
+            - name
+            - namespace
+            - description
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+            description:
+              type: string
+        spec:
+          type: object
+          required:
+            - type
+            - deployment
+          properties:
+            type:
+              type: string
+              enum: [mcp-guardrail]
+            deployment:
+              type: string
+            parameters:
+              type: string
+            disabled:
+              type: boolean
+              default: false
+
+    GuardrailWithUsage:
+      allOf:
+        - $ref: '#/components/schemas/Guardrail'
+        - type: object
+          properties:
+            usage:
+              type: object
+              properties:
+                tools:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ToolGuardrailAssociation'
+                workloadTools:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/WorkloadToolGuardrailAssociation'
+
+    GuardrailListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Guardrail'
+        totalCount:
+          type: integer
+
+    CreateGuardrailInput:
+      type: object
+      required:
+        - metadata
+        - spec
+      properties:
+        metadata:
+          type: object
+          required:
+            - name
+            - description
+          properties:
+            name:
+              type: string
+              pattern: '^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$'
+            namespace:
+              type: string
+              default: default
+            description:
+              type: string
+              maxLength: 1000
+        spec:
+          type: object
+          required:
+            - deployment
+          properties:
+            deployment:
+              type: string
+              maxLength: 2000
+            parameters:
+              type: string
+              maxLength: 10000
+
+    UpdateGuardrailInput:
+      type: object
+      properties:
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+        spec:
+          type: object
+          properties:
+            deployment:
+              type: string
+            parameters:
+              type: string
+            disabled:
+              type: boolean
+
+    ToolGuardrailAssociation:
+      type: object
+      properties:
+        toolNamespace:
+          type: string
+        toolName:
+          type: string
+        guardrail:
+          $ref: '#/components/schemas/Guardrail'
+        executionTiming:
+          type: string
+          enum: [pre-execution, post-execution]
+
+    WorkloadToolGuardrailAssociation:
+      type: object
+      properties:
+        workloadNamespace:
+          type: string
+        workloadName:
+          type: string
+        toolNamespace:
+          type: string
+        toolName:
+          type: string
+        guardrail:
+          $ref: '#/components/schemas/Guardrail'
+        executionTiming:
+          type: string
+          enum: [pre-execution, post-execution]
+        source:
+          type: string
+          enum: [tool, workload]
+          description: "'tool' = inherited from tool-level, 'workload' = added at workload level"
+
+    AttachGuardrailInput:
+      type: object
+      required:
+        - guardrailNamespace
+        - guardrailName
+        - executionTiming
+      properties:
+        guardrailNamespace:
+          type: string
+        guardrailName:
+          type: string
+        executionTiming:
+          type: string
+          enum: [pre-execution, post-execution]
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
