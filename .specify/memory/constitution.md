@@ -1,16 +1,15 @@
 <!--
 Sync Impact Report:
-- Version change: 1.3.0 → 1.5.0
+- Version change: 1.6.0 → 1.7.0
 - New principles added:
-  * X. Red Hat Registry First - Container images must use Red Hat supported registries
-  * XI. User Approval - User must verify problem solutions before execution
+  * XIII. Branch Documentation - Polish phase must create IMPLEMENTATION-SUMMARY.md
 - Modified principles: None
 - Added sections: None
 - Removed sections: None
 - Templates requiring updates:
-  ✅ plan-template.md - Constitution Check section dynamically references principles; no changes needed
+  ✅ plan-template.md - No direct principle references; compatible
   ✅ spec-template.md - No direct principle references; compatible
-  ✅ tasks-template.md - No direct principle references; compatible
+  ✅ tasks-template.md - Updated with documentation task in Polish phase
 - Follow-up TODOs: None
 -->
 
@@ -73,6 +72,16 @@ When the user identifies a problem, the proposed solution MUST be verified by th
 
 **Rationale**: Automated solutions to user-identified problems may lack context or be incorrect. User verification ensures the proposed fix aligns with intent. Conversely, redundant verification of explicit instructions slows down the development workflow.
 
+### XII. Backend-First Implementation
+When a user story involves both backend and frontend work, the implementation MUST be split into two sequential phases in tasks.md. Phase A MUST implement all backend functionality including database changes, service layer, API endpoints, unit tests, and API/sanity tests. Phase A MUST pass all tests before Phase B begins. Phase B MUST implement the frontend components, hooks, and UI integration. Frontend work MUST NOT start until backend implementation is complete and verified.
+
+**Rationale**: Backend-first implementation ensures the API contract is stable before frontend development begins, preventing wasted effort on UI that targets incomplete or changing endpoints. Running backend tests before frontend work catches integration issues early, reduces debugging complexity, and enables parallel frontend development by different team members once the API is verified. This approach also supports incremental delivery where backend functionality can be demoed or integrated with other systems before UI is complete.
+
+### XIII. Branch Documentation
+In the final phase (Polish) of every feature branch, an `IMPLEMENTATION-SUMMARY.md` file MUST be created in the `specs/<branch-name>/` directory. This document MUST explain what was accomplished in the branch, including: user stories implemented, architecture decisions, files modified/created, API endpoints added, and test coverage. The summary MUST be comprehensive enough for a new team member to understand the feature without reading every commit.
+
+**Rationale**: Feature branches often span multiple sessions and involve many changes across the codebase. A summary document provides institutional knowledge, aids code review, supports onboarding, and creates an audit trail of implementation decisions. Without documentation, context is lost when the branch is merged.
+
 ## Security Requirements
 
 All code MUST undergo security review before production deployment. Container images MUST be scanned for vulnerabilities and updated regularly. Network communication between components MUST use encrypted channels. Authentication and authorization MUST follow Red Hat Developer Hub standards. No sensitive data MUST be stored in container images or configuration files.
@@ -83,6 +92,6 @@ Components MUST support Blue-Green deployment patterns on OpenShift. Resource li
 
 ## Governance
 
-This constitution supersedes all other development practices. All pull requests MUST verify compliance with these principles. Any deviation from security-first principle requires explicit justification and security team approval. Component isolation violations MUST be documented with technical rationale. Configuration-first violations require architecture review. Backstage catalog integration MUST be demonstrated for all MCP entity types, including verification that the database serves as source of truth and CRUD APIs are available. Platform compatibility MUST be verified against vanilla OpenShift. Language choice MUST be justified if deviating from TypeScript-first principle. Type safety violations require explicit justification and technical review. Container image sources MUST be verified against approved Red Hat registries; any Docker Hub usage MUST be flagged and remediated before merge.
+This constitution supersedes all other development practices. All pull requests MUST verify compliance with these principles. Any deviation from security-first principle requires explicit justification and security team approval. Component isolation violations MUST be documented with technical rationale. Configuration-first violations require architecture review. Backstage catalog integration MUST be demonstrated for all MCP entity types, including verification that the database serves as source of truth and CRUD APIs are available. Platform compatibility MUST be verified against vanilla OpenShift. Language choice MUST be justified if deviating from TypeScript-first principle. Type safety violations require explicit justification and technical review. Container image sources MUST be verified against approved Red Hat registries; any Docker Hub usage MUST be flagged and remediated before merge. Full-stack user stories MUST follow backend-first phasing with verified backend tests before frontend implementation begins.
 
-**Version**: 1.5.0 | **Ratified**: 2025-10-26 | **Last Amended**: 2025-12-21
+**Version**: 1.7.0 | **Ratified**: 2025-10-26 | **Last Amended**: 2026-01-08
