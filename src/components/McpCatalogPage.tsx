@@ -16,10 +16,11 @@ import {
   Flex,
   FlexItem,
 } from '@patternfly/react-core';
-import { ServerIcon, WrenchIcon, CubeIcon } from '@patternfly/react-icons';
+import { ServerIcon, WrenchIcon, CubeIcon, ShieldAltIcon } from '@patternfly/react-icons';
 import ServersTab from './ServersTab';
 import ToolsTab from './ToolsTab';
 import WorkloadsTab from './WorkloadsTab';
+import GuardrailsTab from './GuardrailsTab';
 import { ErrorBoundary } from './shared/ErrorBoundary';
 
 /**
@@ -29,14 +30,14 @@ import { ErrorBoundary } from './shared/ErrorBoundary';
 const McpCatalogPage: React.FC = () => {
   const location = useLocation();
   const history = useHistory();
-  
+
   // Get active tab and search from URL query parameters
   const searchParams = new URLSearchParams(location.search);
   const activeTab = searchParams.get('type') || 'server';
   const urlSearch = searchParams.get('search') || '';
-  
+
   const [globalSearch, setGlobalSearch] = React.useState(urlSearch);
-  
+
   // Update URL when search changes
   const updateSearch = (value: string) => {
     setGlobalSearch(value);
@@ -48,12 +49,16 @@ const McpCatalogPage: React.FC = () => {
     }
     history.replace(`/mcp-catalog?${params.toString()}`);
   };
-  
-  const handleTabClick = (_event: React.MouseEvent<HTMLElement, MouseEvent>, tabIndex: string | number) => {
+
+  const handleTabClick = (
+    _event: React.MouseEvent<HTMLElement, MouseEvent>,
+    tabIndex: string | number,
+  ) => {
     const tabMap: Record<string, string> = {
       '0': 'server',
       '1': 'tool',
       '2': 'workload',
+      '3': 'guardrail',
     };
     const tabName = tabMap[String(tabIndex)] || 'server';
     const params = new URLSearchParams();
@@ -72,13 +77,15 @@ const McpCatalogPage: React.FC = () => {
         return 1;
       case 'workload':
         return 2;
+      case 'guardrail':
+        return 3;
       default:
         return 0;
     }
   };
-  
+
   // Quick filter to switch to a specific entity type
-  const handleTypeFilter = (type: 'server' | 'tool' | 'workload') => {
+  const handleTypeFilter = (type: 'server' | 'tool' | 'workload' | 'guardrail') => {
     const params = new URLSearchParams();
     params.set('type', type);
     if (globalSearch) {
@@ -90,18 +97,19 @@ const McpCatalogPage: React.FC = () => {
   return (
     <>
       <PageSection>
-        <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
+        <Flex
+          justifyContent={{ default: 'justifyContentSpaceBetween' }}
+          alignItems={{ default: 'alignItemsCenter' }}
+        >
           <FlexItem>
             <Title headingLevel="h1" size="lg">
               MCP Tools Catalog
             </Title>
-            <p>
-              Browse and manage Model Context Protocol (MCP) servers, tools, and workloads.
-            </p>
+            <p>Browse and manage Model Context Protocol (MCP) servers, tools, and workloads.</p>
           </FlexItem>
         </Flex>
       </PageSection>
-      
+
       <PageSection padding={{ default: 'noPadding' }}>
         <Toolbar>
           <ToolbarContent>
@@ -156,13 +164,26 @@ const McpCatalogPage: React.FC = () => {
                   >
                     Workloads
                   </Label>
+                  <Label
+                    color={activeTab === 'guardrail' ? 'blue' : 'grey'}
+                    icon={<ShieldAltIcon />}
+                    onClick={() => handleTypeFilter('guardrail')}
+                    onKeyDown={(e) => e.key === 'Enter' && handleTypeFilter('guardrail')}
+                    style={{ cursor: 'pointer' }}
+                    tabIndex={0}
+                    role="button"
+                    aria-pressed={activeTab === 'guardrail'}
+                    aria-label="Filter by guardrails"
+                  >
+                    Guardrails
+                  </Label>
                 </LabelGroup>
               </ToolbarItem>
             </ToolbarGroup>
           </ToolbarContent>
         </Toolbar>
       </PageSection>
-      
+
       <PageSection padding={{ default: 'noPadding' }}>
         <Tabs
           activeKey={getActiveTabIndex()}
@@ -188,6 +209,13 @@ const McpCatalogPage: React.FC = () => {
             <PageSection>
               <ErrorBoundary>
                 <WorkloadsTab initialSearch={globalSearch} />
+              </ErrorBoundary>
+            </PageSection>
+          </Tab>
+          <Tab eventKey={3} title={<TabTitleText>Guardrails</TabTitleText>}>
+            <PageSection>
+              <ErrorBoundary>
+                <GuardrailsTab initialSearch={globalSearch} />
               </ErrorBoundary>
             </PageSection>
           </Tab>

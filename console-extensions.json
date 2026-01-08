@@ -32,6 +32,30 @@
     }
   },
   {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/mcp-catalog/guardrails/create",
+      "component": { "$codeRef": "GuardrailCreatePage" }
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/mcp-catalog/guardrails/:name/edit",
+      "component": { "$codeRef": "GuardrailEditPage" }
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/mcp-catalog/guardrails/:name",
+      "component": { "$codeRef": "GuardrailsPage" }
+    }
+  },
+  {
     "type": "console.navigation/href",
     "properties": {
       "id": "mcp-catalog",
@@ -75,6 +99,16 @@
       "id": "mcp-workloads",
       "name": "Workloads",
       "href": "/mcp-catalog?type=workload",
+      "perspective": "admin",
+      "section": "mcp-tools"
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "mcp-guardrails",
+      "name": "Guardrails",
+      "href": "/mcp-catalog?type=guardrail",
       "perspective": "admin",
       "section": "mcp-tools"
     }

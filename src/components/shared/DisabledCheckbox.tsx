@@ -28,34 +28,34 @@ interface DisabledCheckboxProps {
  * - Immediate persistence (default): Uses useToolDisabledState hook
  * - Callback pattern (readOnly=false, onToggle provided): Uses callback for batch editing
  */
-export const DisabledCheckbox: React.FC<DisabledCheckboxProps> = ({ 
-  tool, 
-  onUpdate, 
+export const DisabledCheckbox: React.FC<DisabledCheckboxProps> = ({
+  tool,
+  onUpdate,
   readOnly = false,
-  onToggle 
+  onToggle,
 }) => {
   const { canEdit, loaded: authLoaded } = useCanEditCatalog();
-  
+
   // Use callback pattern if onToggle is provided and not in read-only mode
   const useCallbackPattern = !readOnly && !!onToggle;
-  
+
   // For callback pattern, just read the state from tool
   const isDisabledCallback = isToolDisabled(tool);
-  
+
   // For immediate persistence, use the hook
   const toolState = useToolDisabledState(tool, onUpdate);
   const isDisabled = useCallbackPattern ? isDisabledCallback : toolState.isDisabled;
   const isUpdating = useCallbackPattern ? false : toolState.isUpdating;
   const error = useCallbackPattern ? null : toolState.error;
-  
-  const handleToggle = useCallbackPattern 
+
+  const handleToggle = useCallbackPattern
     ? () => {
         if (onToggle) {
           onToggle(tool);
         }
       }
     : toolState.toggle;
-  
+
   const retry = useCallbackPattern ? undefined : toolState.retry;
   const clearError = useCallbackPattern ? undefined : toolState.clearError;
 

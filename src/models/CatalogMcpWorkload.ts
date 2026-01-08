@@ -14,16 +14,16 @@ export const CATALOG_MCP_WORKLOAD_TYPE = 'mcp-workload';
 /**
  * MCP Workload entity interface.
  * Represents a workload that consumes MCP tools in the Backstage Catalog.
- * 
+ *
  * Workloads can have different types:
  * - `service`: A long-running service that uses MCP tools
  * - `workflow`: A scheduled or triggered workflow
  * - `mcp-workload`: Generic MCP workload type
- * 
+ *
  * Tool dependencies are declared via `spec.dependsOn` or `spec.consumes`.
- * 
+ *
  * @extends Entity - Backstage base entity type
- * 
+ *
  * @example
  * ```yaml
  * apiVersion: backstage.io/v1alpha1

@@ -95,43 +95,33 @@ const mockServers: CatalogMcpServer[] = [
 ];
 
 const renderWithRouter = (component: React.ReactElement) => {
-  return render(
-    <MemoryRouter>
-      {component}
-    </MemoryRouter>
-  );
+  return render(<MemoryRouter>{component}</MemoryRouter>);
 };
 
 describe('DependencyTreeView', () => {
   it('renders empty state when workload has no dependencies', () => {
     renderWithRouter(
-      <DependencyTreeView
-        workload={mockWorkloadNoTools}
-        tools={mockTools}
-        servers={mockServers}
-      />
+      <DependencyTreeView workload={mockWorkloadNoTools} tools={mockTools} servers={mockServers} />,
     );
 
     expect(screen.getByText('No Dependencies')).toBeInTheDocument();
-    expect(screen.getByText('This workload does not have any tool dependencies.')).toBeInTheDocument();
+    expect(
+      screen.getByText('This workload does not have any tool dependencies.'),
+    ).toBeInTheDocument();
   });
 
   it('renders tree view with dependencies', () => {
     renderWithRouter(
-      <DependencyTreeView
-        workload={mockWorkload}
-        tools={mockTools}
-        servers={mockServers}
-      />
+      <DependencyTreeView workload={mockWorkload} tools={mockTools} servers={mockServers} />,
     );
 
     // Should show the workload name at root
     expect(screen.getByText('cicd-pipeline')).toBeInTheDocument();
-    
+
     // Should show server nodes
     expect(screen.getByText('github-mcp')).toBeInTheDocument();
     expect(screen.getByText('kubernetes-mcp')).toBeInTheDocument();
-    
+
     // Should show tool nodes
     expect(screen.getByText('create-issue')).toBeInTheDocument();
     expect(screen.getByText('list-pods')).toBeInTheDocument();
@@ -139,11 +129,7 @@ describe('DependencyTreeView', () => {
 
   it('has accessible region container', () => {
     renderWithRouter(
-      <DependencyTreeView
-        workload={mockWorkload}
-        tools={mockTools}
-        servers={mockServers}
-      />
+      <DependencyTreeView workload={mockWorkload} tools={mockTools} servers={mockServers} />,
     );
 
     expect(screen.getByRole('region', { name: 'Dependency tree view' })).toBeInTheDocument();
@@ -151,26 +137,18 @@ describe('DependencyTreeView', () => {
 
   it('has accessible search input', () => {
     renderWithRouter(
-      <DependencyTreeView
-        workload={mockWorkload}
-        tools={mockTools}
-        servers={mockServers}
-      />
+      <DependencyTreeView workload={mockWorkload} tools={mockTools} servers={mockServers} />,
     );
 
     expect(screen.getByPlaceholderText('Filter dependencies...')).toHaveAttribute(
       'aria-label',
-      'Filter dependencies by name'
+      'Filter dependencies by name',
     );
   });
 
   it('displays total dependency count', () => {
     renderWithRouter(
-      <DependencyTreeView
-        workload={mockWorkload}
-        tools={mockTools}
-        servers={mockServers}
-      />
+      <DependencyTreeView workload={mockWorkload} tools={mockTools} servers={mockServers} />,
     );
 
     expect(screen.getByText('2 total dependencies')).toBeInTheDocument();
@@ -178,11 +156,7 @@ describe('DependencyTreeView', () => {
 
   it('filters tree by search term', async () => {
     renderWithRouter(
-      <DependencyTreeView
-        workload={mockWorkload}
-        tools={mockTools}
-        servers={mockServers}
-      />
+      <DependencyTreeView workload={mockWorkload} tools={mockTools} servers={mockServers} />,
     );
 
     const searchInput = screen.getByPlaceholderText('Filter dependencies...');
@@ -197,11 +171,7 @@ describe('DependencyTreeView', () => {
 
   it('shows no matches message when search has no results', async () => {
     renderWithRouter(
-      <DependencyTreeView
-        workload={mockWorkload}
-        tools={mockTools}
-        servers={mockServers}
-      />
+      <DependencyTreeView workload={mockWorkload} tools={mockTools} servers={mockServers} />,
     );
 
     const searchInput = screen.getByPlaceholderText('Filter dependencies...');
@@ -214,11 +184,7 @@ describe('DependencyTreeView', () => {
 
   it('shows View links for existing entities', () => {
     renderWithRouter(
-      <DependencyTreeView
-        workload={mockWorkload}
-        tools={mockTools}
-        servers={mockServers}
-      />
+      <DependencyTreeView workload={mockWorkload} tools={mockTools} servers={mockServers} />,
     );
 
     const viewLinks = screen.getAllByText('View →');
@@ -239,7 +205,7 @@ describe('DependencyTreeView', () => {
         workload={workloadWithMissingTool}
         tools={mockTools}
         servers={mockServers}
-      />
+      />,
     );
 
     // The missing tool should show 'Unknown Server' as parent since tool doesn't exist
@@ -249,17 +215,13 @@ describe('DependencyTreeView', () => {
 
   it('groups tools under their parent servers', () => {
     renderWithRouter(
-      <DependencyTreeView
-        workload={mockWorkload}
-        tools={mockTools}
-        servers={mockServers}
-      />
+      <DependencyTreeView workload={mockWorkload} tools={mockTools} servers={mockServers} />,
     );
 
     // Both servers should be shown
     expect(screen.getByText('github-mcp')).toBeInTheDocument();
     expect(screen.getByText('kubernetes-mcp')).toBeInTheDocument();
-    
+
     // Both tools should be shown
     expect(screen.getByText('create-issue')).toBeInTheDocument();
     expect(screen.getByText('list-pods')).toBeInTheDocument();
@@ -267,16 +229,12 @@ describe('DependencyTreeView', () => {
 
   it('renders tree with proper structure', () => {
     renderWithRouter(
-      <DependencyTreeView
-        workload={mockWorkload}
-        tools={mockTools}
-        servers={mockServers}
-      />
+      <DependencyTreeView workload={mockWorkload} tools={mockTools} servers={mockServers} />,
     );
 
     // Workload should be at the root
     expect(screen.getByText('cicd-pipeline')).toBeInTheDocument();
-    
+
     // Tree should have proper structure (workload -> servers -> tools)
     const tree = screen.getByRole('tree');
     expect(tree).toBeInTheDocument();
@@ -284,11 +242,7 @@ describe('DependencyTreeView', () => {
 
   it('has accessible tree view', () => {
     renderWithRouter(
-      <DependencyTreeView
-        workload={mockWorkload}
-        tools={mockTools}
-        servers={mockServers}
-      />
+      <DependencyTreeView workload={mockWorkload} tools={mockTools} servers={mockServers} />,
     );
 
     expect(screen.getByRole('tree', { name: 'Workload dependency hierarchy' })).toBeInTheDocument();

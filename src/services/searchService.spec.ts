@@ -189,16 +189,14 @@ describe('searchService', () => {
           lifecycle: 'production',
           owner: 'ops-team',
         },
-        relations: [
-          { type: 'partOf', targetRef: 'component:default/relation-mcp' },
-        ],
+        relations: [{ type: 'partOf', targetRef: 'component:default/relation-mcp' }],
       },
     ];
 
     it('filters tools by subcomponentOf', () => {
       const result = filterToolsByServer(mockTools, 'github-mcp');
       expect(result).toHaveLength(2);
-      expect(result.map(t => t.metadata.name)).toEqual(['create-issue', 'list-issues']);
+      expect(result.map((t) => t.metadata.name)).toEqual(['create-issue', 'list-issues']);
     });
 
     it('returns different tools for different servers', () => {

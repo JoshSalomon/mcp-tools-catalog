@@ -6,7 +6,10 @@ interface PaginationProps {
   page: number;
   perPage: number;
   onSetPage: (_event: React.MouseEvent | React.KeyboardEvent | MouseEvent, newPage: number) => void;
-  onPerPageSelect: (_event: React.MouseEvent | React.KeyboardEvent | MouseEvent, newPerPage: number) => void;
+  onPerPageSelect: (
+    _event: React.MouseEvent | React.KeyboardEvent | MouseEvent,
+    newPerPage: number,
+  ) => void;
 }
 
 export const Pagination: React.FC<PaginationProps> = ({

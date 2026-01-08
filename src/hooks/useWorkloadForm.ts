@@ -54,14 +54,14 @@ export interface WorkloadFormState {
 
 /**
  * Hook to manage workload form state with validation.
- * 
+ *
  * @param initialData - Initial form data (for edit mode) or default values (for create mode)
  * @param isEditMode - Whether this is edit mode (affects change detection)
  * @returns State and actions for form management
  */
 export const useWorkloadForm = (
   initialData?: Partial<WorkloadFormData>,
-  isEditMode: boolean = false
+  isEditMode = false,
 ): WorkloadFormState => {
   const defaultData: WorkloadFormData = {
     name: '',
@@ -75,7 +75,7 @@ export const useWorkloadForm = (
 
   const [formData, setFormData] = useState<WorkloadFormData>(defaultData);
   const [originalData, setOriginalData] = useState<WorkloadFormData | null>(
-    isEditMode ? { ...defaultData } : null
+    isEditMode ? { ...defaultData } : null,
   );
   const [errors, setErrors] = useState<WorkloadFormErrors>({});
 
@@ -95,28 +95,31 @@ export const useWorkloadForm = (
     }
   }, [initialData, isEditMode]);
 
-  const updateField = useCallback((field: keyof WorkloadFormData, value: any) => {
-    setFormData(prev => {
-      const updated = { ...prev };
-      if (field === 'selectedTools') {
-        updated.selectedTools = value instanceof Set ? value : new Set(value);
-      } else {
-        (updated as any)[field] = value;
-      }
-      return updated;
-    });
-    // Clear error for this field when user starts typing
-    if (errors[field]) {
-      setErrors(prev => {
+  const updateField = useCallback(
+    (field: keyof WorkloadFormData, value: any) => {
+      setFormData((prev) => {
         const updated = { ...prev };
-        delete updated[field];
+        if (field === 'selectedTools') {
+          updated.selectedTools = value instanceof Set ? value : new Set(value);
+        } else {
+          (updated as any)[field] = value;
+        }
         return updated;
       });
-    }
-  }, [errors]);
+      // Clear error for this field when user starts typing
+      if (errors[field]) {
+        setErrors((prev) => {
+          const updated = { ...prev };
+          delete updated[field];
+          return updated;
+        });
+      }
+    },
+    [errors],
+  );
 
   const toggleTool = useCallback((toolRef: string) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const updated = { ...prev };
       const newSet = new Set(updated.selectedTools);
       if (newSet.has(toolRef)) {

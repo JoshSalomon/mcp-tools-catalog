@@ -17,12 +17,12 @@ export const MCP_TOOL_DISABLED_ANNOTATION = 'mcp-catalog.io/disabled';
 /**
  * MCP Tool entity interface.
  * Represents an MCP tool provided by an MCP server in the Backstage Catalog.
- * 
+ *
  * Tools are linked to their parent server using `spec.subcomponentOf`, which
  * generates bidirectional `partOf`/`hasPart` relations in Backstage.
- * 
+ *
  * @extends Entity - Backstage base entity type
- * 
+ *
  * @example
  * ```yaml
  * apiVersion: backstage.io/v1alpha1

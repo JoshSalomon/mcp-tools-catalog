@@ -324,8 +324,24 @@ test_backstage() {
         log_skip "No workloads found (workloads are optional)"
     fi
     
-    # BST-006: Entity Count
-    log_test "BST-006" "Total entity count"
+    # BST-006: Guardrails Exist (006-mcp-guardrails)
+    log_test "BST-006" "MCP guardrails in database"
+    local guardrails_response=$(curl -s "$BASE_URL/api/mcp-entity-api/guardrails" 2>/dev/null)
+    local total_guardrails=$(echo "$guardrails_response" | jq '.items | length' 2>/dev/null || echo "0")
+    if [[ "$total_guardrails" -ge 0 ]]; then
+        log_pass
+        log_info "$total_guardrails guardrail(s) found in MCP Entity API database"
+        if [[ "$VERBOSE" == "true" && "$total_guardrails" -gt 0 ]]; then
+            echo "$guardrails_response" | jq -r '.items[].name' | while read name; do
+                log_detail "  - $name"
+            done
+        fi
+    else
+        log_skip "Guardrails API not available"
+    fi
+
+    # BST-007: Entity Count
+    log_test "BST-007" "Total entity count"
     local total=$(curl -s "$BASE_URL/api/catalog/entities" 2>/dev/null | jq 'length' 2>/dev/null || echo "0")
     if [[ "$total" -gt 0 ]]; then
         log_pass

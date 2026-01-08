@@ -16,7 +16,11 @@ import { ServerIcon, SearchIcon } from '@patternfly/react-icons';
 import { filterResources } from '../services/searchService';
 import { usePerformanceMonitor } from '../utils/performanceMonitor';
 import { Pagination } from './shared/Pagination';
-import { CatalogMcpServer, CATALOG_MCP_SERVER_KIND, CATALOG_MCP_SERVER_TYPE } from '../models/CatalogMcpServer';
+import {
+  CatalogMcpServer,
+  CATALOG_MCP_SERVER_KIND,
+  CATALOG_MCP_SERVER_TYPE,
+} from '../models/CatalogMcpServer';
 import { useCatalogEntities } from '../services/catalogService';
 
 interface ServersTabProps {
@@ -29,7 +33,7 @@ const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
   const [searchTerm, setSearchTerm] = React.useState(initialSearch);
   const [page, setPage] = React.useState(1);
   const [perPage, setPerPage] = React.useState(100);
-  
+
   // Sync with parent search term
   React.useEffect(() => {
     setSearchTerm(initialSearch);
@@ -39,7 +43,10 @@ const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
   const stopPerfMonitor = usePerformanceMonitor('ServersTab');
 
   // Fetch CatalogMcpServer entities from Backstage Catalog
-  const [allEntities, loaded, loadError] = useCatalogEntities<CatalogMcpServer>(CATALOG_MCP_SERVER_KIND, CATALOG_MCP_SERVER_TYPE);
+  const [allEntities, loaded, loadError] = useCatalogEntities<CatalogMcpServer>(
+    CATALOG_MCP_SERVER_KIND,
+    CATALOG_MCP_SERVER_TYPE,
+  );
 
   React.useEffect(() => {
     if (loaded) {
@@ -51,16 +58,14 @@ const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
   // Also check label mcp-catalog.io/type === 'server' as fallback
   const servers = React.useMemo(() => {
     if (!allEntities || allEntities.length === 0) return [];
-    
-    return allEntities.filter(entity => {
+
+    return allEntities.filter((entity) => {
       const entityType = entity.spec?.type || '';
       const labelType = entity.metadata.labels?.['mcp-catalog.io/type'] || '';
-      
+
       // Check spec.type: 'mcp-server' or 'server'
       // Also check label as fallback
-      return entityType === 'mcp-server' || 
-             entityType === 'server' ||
-             labelType === 'server';
+      return entityType === 'mcp-server' || entityType === 'server' || labelType === 'server';
     });
   }, [allEntities]);
 
@@ -162,23 +167,31 @@ const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
             {paginatedServers.map((server) => {
               // Count tools based on 'hasPart' relations (standard Backstage pattern)
               // Check both relations array and spec.hasPart
-              let toolCount = server.relations?.filter(r => r.type === 'hasPart').length || 0;
-              
+              let toolCount = server.relations?.filter((r) => r.type === 'hasPart').length || 0;
+
               // Also check spec.hasPart if relations are not populated yet
               if (toolCount === 0 && server.spec.hasPart) {
-                const hasPart = Array.isArray(server.spec.hasPart) ? server.spec.hasPart : [server.spec.hasPart];
+                const hasPart = Array.isArray(server.spec.hasPart)
+                  ? server.spec.hasPart
+                  : [server.spec.hasPart];
                 toolCount = hasPart.length;
               }
-              
+
               return (
-                <Tr key={server.metadata.uid || `${server.metadata.namespace}/${server.metadata.name}`}>
+                <Tr
+                  key={
+                    server.metadata.uid || `${server.metadata.namespace}/${server.metadata.name}`
+                  }
+                >
                   <Td dataLabel="Name">
                     <a
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
                         history.push(
-                          `/mcp-catalog/servers/${server.metadata.name}?namespace=${server.metadata.namespace || 'default'}`
+                          `/mcp-catalog/servers/${server.metadata.name}?namespace=${
+                            server.metadata.namespace || 'default'
+                          }`,
                         );
                       }}
                     >
@@ -189,9 +202,7 @@ const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
                   <Td dataLabel="Type">{server.spec.type}</Td>
                   <Td dataLabel="Lifecycle">{server.spec.lifecycle}</Td>
                   <Td dataLabel="Owner">{server.spec.owner}</Td>
-                  <Td dataLabel="Tools">
-                    {toolCount}
-                  </Td>
+                  <Td dataLabel="Tools">{toolCount}</Td>
                 </Tr>
               );
             })}

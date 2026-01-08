@@ -69,11 +69,7 @@ const mockTools: CatalogMcpTool[] = [
 ];
 
 const renderWithRouter = (component: React.ReactElement) => {
-  return render(
-    <MemoryRouter>
-      {component}
-    </MemoryRouter>
-  );
+  return render(<MemoryRouter>{component}</MemoryRouter>);
 };
 
 describe('ToolsTab', () => {
@@ -181,8 +177,8 @@ describe('ToolsTab', () => {
 
     // Check the table exists with column headers
     const headers = screen.getAllByRole('columnheader');
-    const headerTexts = headers.map(h => h.textContent);
-    
+    const headerTexts = headers.map((h) => h.textContent);
+
     expect(headerTexts).toContain('Name');
     expect(headerTexts).toContain('Namespace');
     expect(headerTexts).toContain('Type');

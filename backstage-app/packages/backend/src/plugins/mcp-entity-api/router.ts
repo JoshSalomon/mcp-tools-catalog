@@ -83,20 +83,22 @@
  *       description: OCP Bearer token for RBAC authentication
  */
 
-import { Router, json, Request, Response, NextFunction } from 'express';
+import { Router, json, text, Request, Response, NextFunction } from 'express';
 import type { Logger } from 'winston';
 import type { Config } from '@backstage/config';
+import YAML from 'yaml';
 import {
   asyncHandler,
   sendSuccessResponse,
   sendCreatedResponse,
   sendNoContentResponse,
-  MCPApiError,
+  ValidationError,
   toMCPApiError,
+  MCPApiError,
 } from './errors';
 import { MCPEntityService } from './service';
-import { createRBACMiddlewareFactory, extractOCPToken } from './auth';
-import type { MCPEntityApiConfig, EntityListParams } from './types';
+import { createRBACMiddlewareFactory, extractOCPToken, createSubjectAccessReviewChecker } from './auth';
+import type { MCPEntityApiConfig, EntityListParams, CreateGuardrailInput, Guardrail, MCPEntityType, AttachGuardrailInput } from './types';
 
 export interface RouterOptions {
   logger: Logger;
@@ -115,6 +117,7 @@ function loadConfig(config: Config): MCPEntityApiConfig {
       server: mcpConfig?.getOptionalString('roles.server') ?? 'mcp-admin',
       tool: mcpConfig?.getOptionalString('roles.tool') ?? 'mcp-admin',
       workload: mcpConfig?.getOptionalString('roles.workload') ?? 'mcp-user',
+      guardrail: mcpConfig?.getOptionalString('roles.guardrail') ?? 'mcp-admin',
     },
   };
 }
@@ -183,6 +186,44 @@ export async function createRouter(
   router.get('/health', (_req, res) => {
     sendSuccessResponse(res, { status: 'ok' });
   });
+
+  // ==========================================================================
+  // Permission Check Endpoint - /auth/can-edit/:entityType
+  // ==========================================================================
+  // Allows frontend to check if the current user has permission to edit
+  // a specific entity type before showing edit buttons.
+
+  router.get(
+    '/auth/can-edit/:entityType',
+    asyncHandler(async (req, res) => {
+      const { entityType } = req.params;
+      const token = extractOCPToken(req);
+
+      if (!token) {
+        sendSuccessResponse(res, { canEdit: false, reason: 'no-token' });
+        return;
+      }
+
+      // Validate entity type
+      const validTypes: MCPEntityType[] = ['mcp-server', 'mcp-tool', 'mcp-workload', 'mcp-guardrail'];
+      if (!validTypes.includes(entityType as MCPEntityType)) {
+        sendSuccessResponse(res, { canEdit: false, reason: 'invalid-type' });
+        return;
+      }
+
+      try {
+        const checker = createSubjectAccessReviewChecker();
+        const canEdit = await checker(token, entityType as MCPEntityType, 'create');
+        sendSuccessResponse(res, { canEdit });
+      } catch (error) {
+        logger.warn('Permission check failed', {
+          entityType,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        sendSuccessResponse(res, { canEdit: false, reason: 'check-failed' });
+      }
+    }),
+  );
 
   // ==========================================================================
   // Catalog API Proxy Endpoint - /catalog-proxy/* (Option 3)
@@ -512,6 +553,168 @@ export async function createRouter(
   );
 
   // ==========================================================================
+  // Tool-Guardrail Association Endpoints - /tools/:ns/:name/guardrails (US3)
+  // ==========================================================================
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/tools/{namespace}/{name}/guardrails:
+   *   get:
+   *     summary: List guardrails attached to a tool
+   *     description: Returns all guardrails attached to a specific tool. No authentication required.
+   *     tags: [Tool Guardrails]
+   *     parameters:
+   *       - in: path
+   *         name: namespace
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: name
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: List of guardrail associations
+   *       404:
+   *         description: Tool not found
+   */
+  // GET /tools/:namespace/:name/guardrails - List guardrails for a tool (T041)
+  // No RBAC required - public read
+  router.get(
+    '/tools/:namespace/:name/guardrails',
+    asyncHandler(async (req, res) => {
+      const { namespace, name } = req.params;
+      const result = await service.listToolGuardrails(namespace, name);
+      sendSuccessResponse(res, { items: result, totalCount: result.length });
+    }),
+  );
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/tools/{namespace}/{name}/guardrails:
+   *   post:
+   *     summary: Attach a guardrail to a tool
+   *     description: Attaches a guardrail to a tool with specified execution timing. Requires mcp-admin role.
+   *     tags: [Tool Guardrails]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: namespace
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: name
+   *         required: true
+   *         schema:
+   *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [guardrailNamespace, guardrailName, executionTiming]
+   *             properties:
+   *               guardrailNamespace:
+   *                 type: string
+   *               guardrailName:
+   *                 type: string
+   *               executionTiming:
+   *                 type: string
+   *                 enum: [pre-execution, post-execution]
+   *     responses:
+   *       201:
+   *         description: Guardrail attached
+   *       400:
+   *         description: Invalid input
+   *       401:
+   *         description: No authentication token
+   *       403:
+   *         description: User lacks mcp-admin role
+   *       404:
+   *         description: Tool or guardrail not found
+   *       409:
+   *         description: Guardrail already attached
+   */
+  // POST /tools/:namespace/:name/guardrails - Attach a guardrail to a tool (T042)
+  // Requires mcp-admin role
+  router.post(
+    '/tools/:namespace/:name/guardrails',
+    rbac('mcp-tool', 'update'),
+    asyncHandler(async (req, res) => {
+      const { namespace, name } = req.params;
+      const input = req.body as AttachGuardrailInput;
+
+      // Basic validation
+      if (!input.guardrailNamespace || !input.guardrailName || !input.executionTiming) {
+        throw new ValidationError('Missing required fields: guardrailNamespace, guardrailName, executionTiming');
+      }
+      if (input.executionTiming !== 'pre-execution' && input.executionTiming !== 'post-execution') {
+        throw new ValidationError('executionTiming must be "pre-execution" or "post-execution"');
+      }
+
+      const result = await service.attachGuardrailToTool(namespace, name, input);
+      sendCreatedResponse(res, result);
+    }),
+  );
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/tools/{namespace}/{name}/guardrails/{guardrailNs}/{guardrailName}:
+   *   delete:
+   *     summary: Detach a guardrail from a tool
+   *     description: Removes a guardrail association from a tool. Requires mcp-admin role.
+   *     tags: [Tool Guardrails]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: namespace
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: name
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: guardrailNs
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: guardrailName
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       204:
+   *         description: Guardrail detached
+   *       401:
+   *         description: No authentication token
+   *       403:
+   *         description: User lacks mcp-admin role
+   *       404:
+   *         description: Tool, guardrail, or association not found
+   */
+  // DELETE /tools/:namespace/:name/guardrails/:guardrailNs/:guardrailName - Detach a guardrail (T043)
+  // Requires mcp-admin role
+  router.delete(
+    '/tools/:namespace/:name/guardrails/:guardrailNs/:guardrailName',
+    rbac('mcp-tool', 'delete'),
+    asyncHandler(async (req, res) => {
+      const { namespace, name, guardrailNs, guardrailName } = req.params;
+      await service.detachGuardrailFromTool(namespace, name, guardrailNs, guardrailName);
+      sendNoContentResponse(res);
+    }),
+  );
+
+  // ==========================================================================
   // Workload Endpoints - /workloads (T027-T030)
   // ==========================================================================
 
@@ -571,6 +774,705 @@ export async function createRouter(
     asyncHandler(async (req, res) => {
       const { namespace, name } = req.params;
       await service.deleteWorkload(namespace, name);
+      sendNoContentResponse(res);
+    }),
+  );
+
+  // ==========================================================================
+  // Workload-Tool-Guardrail Endpoints - /workloads/.../tools/.../guardrails (US4)
+  // ==========================================================================
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/workloads/{wNs}/{wName}/tools/{tNs}/{tName}/guardrails:
+   *   get:
+   *     summary: List guardrails for a workload-tool relationship
+   *     description: Returns all guardrails (inherited and workload-specific) for a workload-tool combination. No authentication required.
+   *     tags: [Workload-Tool Guardrails]
+   *     parameters:
+   *       - in: path
+   *         name: wNs
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Workload namespace
+   *       - in: path
+   *         name: wName
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Workload name
+   *       - in: path
+   *         name: tNs
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Tool namespace
+   *       - in: path
+   *         name: tName
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Tool name
+   *     responses:
+   *       200:
+   *         description: List of guardrail associations
+   *       404:
+   *         description: Workload or tool not found
+   */
+  // GET /workloads/:wNs/:wName/tools/:tNs/:tName/guardrails - List guardrails
+  // No RBAC required - public read
+  router.get(
+    '/workloads/:wNs/:wName/tools/:tNs/:tName/guardrails',
+    asyncHandler(async (req, res) => {
+      const { wNs, wName, tNs, tName } = req.params;
+      const result = await service.listWorkloadToolGuardrails(wNs, wName, tNs, tName);
+      sendSuccessResponse(res, { items: result, totalCount: result.length });
+    }),
+  );
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/workloads/{wNs}/{wName}/tools/{tNs}/{tName}/guardrails:
+   *   post:
+   *     summary: Add a guardrail to a workload-tool relationship
+   *     description: Adds a guardrail to a specific workload-tool combination (workload-level). Requires mcp-user role.
+   *     tags: [Workload-Tool Guardrails]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: wNs
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Workload namespace
+   *       - in: path
+   *         name: wName
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Workload name
+   *       - in: path
+   *         name: tNs
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Tool namespace
+   *       - in: path
+   *         name: tName
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Tool name
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [guardrailNamespace, guardrailName, executionTiming]
+   *             properties:
+   *               guardrailNamespace:
+   *                 type: string
+   *               guardrailName:
+   *                 type: string
+   *               executionTiming:
+   *                 type: string
+   *                 enum: [pre-execution, post-execution]
+   *     responses:
+   *       201:
+   *         description: Guardrail added
+   *       400:
+   *         description: Invalid input
+   *       401:
+   *         description: No authentication token
+   *       403:
+   *         description: User lacks mcp-user role
+   *       404:
+   *         description: Workload, tool, or guardrail not found
+   *       409:
+   *         description: Guardrail already attached
+   */
+  // POST /workloads/:wNs/:wName/tools/:tNs/:tName/guardrails - Add a guardrail
+  // Requires mcp-user role (workload-level operations)
+  router.post(
+    '/workloads/:wNs/:wName/tools/:tNs/:tName/guardrails',
+    rbac('mcp-workload', 'update'),
+    asyncHandler(async (req, res) => {
+      const { wNs, wName, tNs, tName } = req.params;
+      const input = req.body as AttachGuardrailInput;
+
+      // Basic validation
+      if (!input.guardrailNamespace || !input.guardrailName || !input.executionTiming) {
+        throw new ValidationError('Missing required fields: guardrailNamespace, guardrailName, executionTiming');
+      }
+      if (input.executionTiming !== 'pre-execution' && input.executionTiming !== 'post-execution') {
+        throw new ValidationError('executionTiming must be "pre-execution" or "post-execution"');
+      }
+
+      const result = await service.addGuardrailToWorkloadTool(wNs, wName, tNs, tName, input);
+      sendCreatedResponse(res, result);
+    }),
+  );
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/workloads/{wNs}/{wName}/tools/{tNs}/{tName}/guardrails/{gNs}/{gName}:
+   *   delete:
+   *     summary: Remove a guardrail from a workload-tool relationship
+   *     description: Removes a guardrail association from a workload-tool combination. Requires mcp-user role.
+   *     tags: [Workload-Tool Guardrails]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: wNs
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Workload namespace
+   *       - in: path
+   *         name: wName
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Workload name
+   *       - in: path
+   *         name: tNs
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Tool namespace
+   *       - in: path
+   *         name: tName
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Tool name
+   *       - in: path
+   *         name: gNs
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Guardrail namespace
+   *       - in: path
+   *         name: gName
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Guardrail name
+   *     responses:
+   *       204:
+   *         description: Guardrail removed
+   *       401:
+   *         description: No authentication token
+   *       403:
+   *         description: User lacks mcp-user role
+   *       404:
+   *         description: Workload, tool, guardrail, or association not found
+   */
+  // DELETE /workloads/:wNs/:wName/tools/:tNs/:tName/guardrails/:gNs/:gName - Remove a guardrail
+  // Requires mcp-user role (workload-level operations)
+  router.delete(
+    '/workloads/:wNs/:wName/tools/:tNs/:tName/guardrails/:gNs/:gName',
+    rbac('mcp-workload', 'delete'),
+    asyncHandler(async (req, res) => {
+      const { wNs, wName, tNs, tName, gNs, gName } = req.params;
+      await service.removeGuardrailFromWorkloadTool(wNs, wName, tNs, tName, gNs, gName);
+      sendNoContentResponse(res);
+    }),
+  );
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/workloads/{wNs}/{wName}/tools/{tNs}/{tName}/guardrails/{gNs}/{gName}:
+   *   put:
+   *     summary: Update a guardrail in a workload-tool relationship
+   *     description: Updates the executionTiming and/or parameters for a guardrail association. Requires mcp-user role.
+   *     tags: [Workload-Tool Guardrails]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: wNs
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Workload namespace
+   *       - in: path
+   *         name: wName
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Workload name
+   *       - in: path
+   *         name: tNs
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Tool namespace
+   *       - in: path
+   *         name: tName
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Tool name
+   *       - in: path
+   *         name: gNs
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Guardrail namespace
+   *       - in: path
+   *         name: gName
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Guardrail name
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               executionTiming:
+   *                 type: string
+   *                 enum: [pre-execution, post-execution]
+   *               parameters:
+   *                 type: string
+   *                 nullable: true
+   *     responses:
+   *       200:
+   *         description: Guardrail association updated
+   *       400:
+   *         description: Invalid input
+   *       401:
+   *         description: No authentication token
+   *       403:
+   *         description: User lacks mcp-user role
+   *       404:
+   *         description: Workload, tool, guardrail, or association not found
+   */
+  // PUT /workloads/:wNs/:wName/tools/:tNs/:tName/guardrails/:gNs/:gName - Update a guardrail
+  // Requires mcp-user role (workload-level operations)
+  router.put(
+    '/workloads/:wNs/:wName/tools/:tNs/:tName/guardrails/:gNs/:gName',
+    rbac('mcp-workload', 'update'),
+    asyncHandler(async (req, res) => {
+      const { wNs, wName, tNs, tName, gNs, gName } = req.params;
+      const { executionTiming, parameters } = req.body;
+
+      // Validate executionTiming if provided
+      if (executionTiming !== undefined && executionTiming !== 'pre-execution' && executionTiming !== 'post-execution') {
+        throw new ValidationError('executionTiming must be "pre-execution" or "post-execution"');
+      }
+
+      const result = await service.updateWorkloadToolGuardrail(
+        wNs,
+        wName,
+        tNs,
+        tName,
+        gNs,
+        gName,
+        { executionTiming, parameters },
+      );
+      sendSuccessResponse(res, result);
+    }),
+  );
+
+  // ==========================================================================
+  // Guardrail Endpoints - /guardrails (006-mcp-guardrails)
+  // ==========================================================================
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/guardrails:
+   *   get:
+   *     summary: List all MCP Guardrails
+   *     description: Returns a paginated list of all MCP Guardrail entities. No authentication required.
+   *     tags: [Guardrails]
+   *     parameters:
+   *       - in: query
+   *         name: namespace
+   *         schema:
+   *           type: string
+   *         description: Filter by namespace
+   *       - in: query
+   *         name: limit
+   *         schema:
+   *           type: integer
+   *         description: Maximum number of results
+   *       - in: query
+   *         name: offset
+   *         schema:
+   *           type: integer
+   *         description: Pagination offset
+   *     responses:
+   *       200:
+   *         description: List of guardrails
+   */
+  // GET /guardrails - List all MCP Guardrails
+  // No RBAC required - public read
+  router.get(
+    '/guardrails',
+    asyncHandler(async (req, res) => {
+      const params = {
+        namespace: req.query.namespace as string | undefined,
+        limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+        offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
+      };
+      const result = await service.listGuardrails(params);
+      sendSuccessResponse(res, result);
+    }),
+  );
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/guardrails:
+   *   post:
+   *     summary: Create an MCP Guardrail
+   *     description: Creates a new MCP Guardrail entity. Requires mcp-admin role.
+   *     tags: [Guardrails]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [metadata, spec]
+   *             properties:
+   *               metadata:
+   *                 type: object
+   *                 required: [name, description]
+   *                 properties:
+   *                   name:
+   *                     type: string
+   *                     minLength: 1
+   *                     maxLength: 63
+   *                   namespace:
+   *                     type: string
+   *                     default: default
+   *                   description:
+   *                     type: string
+   *                     maxLength: 1000
+   *               spec:
+   *                 type: object
+   *                 required: [deployment]
+   *                 properties:
+   *                   deployment:
+   *                     type: string
+   *                     maxLength: 2000
+   *                   parameters:
+   *                     type: string
+   *                     maxLength: 10000
+   *     responses:
+   *       201:
+   *         description: Guardrail created
+   *       400:
+   *         description: Validation error
+   *       401:
+   *         description: No authentication token provided
+   *       403:
+   *         description: User lacks mcp-admin role
+   *       409:
+   *         description: Guardrail already exists
+   */
+  // POST /guardrails - Create an MCP Guardrail (T030)
+  // Requires mcp-admin role
+  router.post(
+    '/guardrails',
+    rbac('mcp-guardrail', 'create'),
+    asyncHandler(async (req, res) => {
+      const result = await service.createGuardrail(req.body);
+      sendCreatedResponse(res, result);
+    }),
+  );
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/guardrails/import:
+   *   post:
+   *     summary: Import MCP Guardrail(s) from YAML
+   *     description: |
+   *       Creates MCP Guardrail entities from YAML content. Supports multi-document YAML
+   *       (multiple guardrails separated by ---). Use ?preview=true to validate without creating.
+   *       Accepts YAML text in request body with Content-Type: text/yaml or application/x-yaml.
+   *       Requires mcp-admin role.
+   *     tags: [Guardrails]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: preview
+   *         schema:
+   *           type: boolean
+   *         description: If true, returns parsed guardrails without creating them
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         text/yaml:
+   *           schema:
+   *             type: string
+   *           example: |
+   *             metadata:
+   *               name: my-guardrail
+   *               description: My guardrail description
+   *             spec:
+   *               deployment: Check for PII in output
+   *         application/x-yaml:
+   *           schema:
+   *             type: string
+   *     responses:
+   *       200:
+   *         description: Preview of guardrails to be imported (when preview=true)
+   *       201:
+   *         description: Guardrail(s) created from YAML
+   *       400:
+   *         description: Invalid YAML or validation error
+   *       401:
+   *         description: No authentication token provided
+   *       403:
+   *         description: User lacks mcp-admin role
+   *       409:
+   *         description: Guardrail already exists
+   */
+  // POST /guardrails/import - Import MCP Guardrail(s) from YAML (T031)
+  // Supports multi-document YAML and preview mode
+  // Requires mcp-admin role
+  router.post(
+    '/guardrails/import',
+    rbac('mcp-guardrail', 'create'),
+    text({ type: ['text/yaml', 'application/x-yaml', 'text/plain'] }),
+    asyncHandler(async (req, res) => {
+      // Parse YAML content from request body
+      const yamlContent = req.body;
+      if (!yamlContent || typeof yamlContent !== 'string') {
+        throw new ValidationError('Request body must contain YAML content');
+      }
+
+      const isPreview = req.query.preview === 'true';
+
+      // Parse all YAML documents (supports multi-document YAML with ---)
+      let documents: YAML.Document.Parsed[];
+      try {
+        documents = YAML.parseAllDocuments(yamlContent);
+      } catch (yamlError) {
+        throw new ValidationError(
+          `Invalid YAML: ${yamlError instanceof Error ? yamlError.message : 'Parse error'}`,
+        );
+      }
+
+      // Extract and validate guardrail inputs from documents
+      const guardrailInputs: CreateGuardrailInput[] = [];
+      for (let i = 0; i < documents.length; i++) {
+        const doc = documents[i];
+        if (doc.errors.length > 0) {
+          throw new ValidationError(
+            `Invalid YAML in document ${i + 1}: ${doc.errors[0].message}`,
+          );
+        }
+        const parsed = doc.toJSON();
+        if (parsed && typeof parsed === 'object') {
+          guardrailInputs.push(parsed as CreateGuardrailInput);
+        }
+      }
+
+      if (guardrailInputs.length === 0) {
+        throw new ValidationError('YAML must contain at least one guardrail with metadata and spec');
+      }
+
+      // Preview mode - return list without creating
+      if (isPreview) {
+        res.json({
+          preview: true,
+          count: guardrailInputs.length,
+          guardrails: guardrailInputs.map(g => ({
+            name: g.metadata?.name || 'unnamed',
+            namespace: g.metadata?.namespace || 'default',
+            description: g.metadata?.description || '',
+          })),
+        });
+        return;
+      }
+
+      // Create all guardrails
+      const results: Guardrail[] = [];
+      const errors: Array<{ name: string; error: string }> = [];
+      for (const input of guardrailInputs) {
+        try {
+          const result = await service.createGuardrail(input);
+          results.push(result);
+        } catch (err) {
+          errors.push({
+            name: input.metadata?.name || 'unnamed',
+            error: err instanceof Error ? err.message : 'Unknown error',
+          });
+        }
+      }
+
+      // For single document with no errors, return the single result (backward compatible)
+      if (guardrailInputs.length === 1 && results.length === 1 && errors.length === 0) {
+        sendCreatedResponse(res, results[0]);
+        return;
+      }
+
+      // If all documents failed, return 400 with errors
+      if (results.length === 0 && errors.length > 0) {
+        res.status(400).json({
+          error: 'ValidationError',
+          message: errors.length === 1
+            ? errors[0].error
+            : `All ${errors.length} guardrails failed validation`,
+          imported: 0,
+          failed: errors.length,
+          guardrails: [],
+          errors,
+        });
+        return;
+      }
+
+      // For multi-document with partial success, return summary
+      res.status(201).json({
+        imported: results.length,
+        failed: errors.length,
+        guardrails: results,
+        errors,
+      });
+    }),
+  );
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/guardrails/{namespace}/{name}:
+   *   get:
+   *     summary: Get a specific MCP Guardrail
+   *     description: Returns a single MCP Guardrail entity with usage information. No authentication required.
+   *     tags: [Guardrails]
+   *     parameters:
+   *       - in: path
+   *         name: namespace
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: name
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Guardrail details with usage information
+   *       404:
+   *         description: Guardrail not found
+   */
+  // GET /guardrails/:namespace/:name - Get a specific guardrail with usage
+  // No RBAC required - public read
+  router.get(
+    '/guardrails/:namespace/:name',
+    asyncHandler(async (req, res) => {
+      const { namespace, name } = req.params;
+      const result = await service.getGuardrail(namespace, name);
+      sendSuccessResponse(res, result);
+    }),
+  );
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/guardrails/{namespace}/{name}:
+   *   put:
+   *     summary: Update an MCP Guardrail
+   *     description: Updates an existing MCP Guardrail entity. Requires mcp-admin role.
+   *     tags: [Guardrails]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: namespace
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: name
+   *         required: true
+   *         schema:
+   *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *     responses:
+   *       200:
+   *         description: Guardrail updated
+   *       401:
+   *         description: No authentication token provided
+   *       403:
+   *         description: User lacks mcp-admin role
+   *       404:
+   *         description: Guardrail not found
+   *       409:
+   *         description: Name conflict (if renaming)
+   */
+  // PUT /guardrails/:namespace/:name - Update a guardrail
+  // Requires mcp-admin role
+  router.put(
+    '/guardrails/:namespace/:name',
+    rbac('mcp-guardrail', 'update'),
+    asyncHandler(async (req, res) => {
+      const { namespace, name } = req.params;
+      const result = await service.updateGuardrail(namespace, name, req.body);
+      sendSuccessResponse(res, result);
+    }),
+  );
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/guardrails/{namespace}/{name}:
+   *   delete:
+   *     summary: Delete an MCP Guardrail
+   *     description: |
+   *       Deletes an MCP Guardrail entity. Fails if guardrail has associations.
+   *       Requires mcp-admin role.
+   *     tags: [Guardrails]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: namespace
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: name
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       204:
+   *         description: Guardrail deleted
+   *       401:
+   *         description: No authentication token
+   *       403:
+   *         description: User lacks mcp-admin role
+   *       404:
+   *         description: Guardrail not found
+   *       409:
+   *         description: Cannot delete - guardrail has associations
+   */
+  // DELETE /guardrails/:namespace/:name - Delete a guardrail
+  // Requires mcp-admin role
+  // Fails if guardrail has tool or workload-tool associations
+  router.delete(
+    '/guardrails/:namespace/:name',
+    rbac('mcp-guardrail', 'delete'),
+    asyncHandler(async (req, res) => {
+      const { namespace, name } = req.params;
+      await service.deleteGuardrail(namespace, name);
       sendNoContentResponse(res);
     }),
   );

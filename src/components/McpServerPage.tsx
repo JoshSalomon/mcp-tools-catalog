@@ -22,7 +22,12 @@ import { usePerformanceMonitor } from '../utils/performanceMonitor';
 import { OfflineIndicator } from './shared/OfflineIndicator';
 import { Breadcrumbs, createMcpCatalogBreadcrumbs } from './shared/Breadcrumbs';
 import { CatalogMcpServer, CATALOG_MCP_SERVER_KIND } from '../models/CatalogMcpServer';
-import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE, isToolDisabled } from '../models/CatalogMcpTool';
+import {
+  CatalogMcpTool,
+  CATALOG_MCP_TOOL_KIND,
+  CATALOG_MCP_TOOL_TYPE,
+  isToolDisabled,
+} from '../models/CatalogMcpTool';
 import { useCatalogEntity, useCatalogEntities } from '../services/catalogService';
 import { useBatchToolState } from '../hooks/useBatchToolState';
 import { useCanEditCatalog } from '../services/authService';
@@ -34,21 +39,20 @@ const McpServerPage: React.FC = () => {
   const params = useParams<{ name: string }>();
   const location = useLocation();
   const history = useHistory();
-  
+
   // OpenShift Console dynamic plugins may not populate useParams correctly
   // Extract name from pathname as fallback: /mcp-catalog/servers/:name
   const extractNameFromPath = (pathname: string): string => {
     const match = pathname.match(/\/mcp-catalog\/servers\/([^/?]+)/);
     return match ? match[1] : '';
   };
-  
+
   // Try params first, then fall back to pathname parsing
   const name = params.name || extractNameFromPath(location.pathname);
-  
-  
+
   const searchParams = new URLSearchParams(location.search);
   const namespace = searchParams.get('namespace') || 'default';
-  
+
   const stopPerfMonitor = usePerformanceMonitor('McpServerPage');
 
   // Don't fetch if name is not available yet
@@ -56,11 +60,11 @@ const McpServerPage: React.FC = () => {
 
   // Fetch server entity
   const [server, serverLoaded, serverError] = useCatalogEntity<CatalogMcpServer>(
-    CATALOG_MCP_SERVER_KIND, 
-    shouldFetch ? name : '__placeholder__', 
+    CATALOG_MCP_SERVER_KIND,
+    shouldFetch ? name : '__placeholder__',
     namespace,
-    location.key,  // Simple cache key
-    'server'  // Explicitly fetch from servers endpoint
+    location.key, // Simple cache key
+    'server', // Explicitly fetch from servers endpoint
   );
 
   // Fetch all tools to find ones provided by this server
@@ -68,7 +72,7 @@ const McpServerPage: React.FC = () => {
   const [tools, toolsLoaded] = useCatalogEntities<CatalogMcpTool>(
     CATALOG_MCP_TOOL_KIND,
     CATALOG_MCP_TOOL_TYPE,
-    namespace
+    namespace,
   );
 
   React.useEffect(() => {
@@ -84,27 +88,30 @@ const McpServerPage: React.FC = () => {
 
   // Check if user has mcp-admin role for tool state editing
   const { canEdit: canEditToolStates, loaded: authLoaded } = useCanEditCatalog();
-  
+
   // Batch tool state management
-  const handleToolStateSaveComplete = React.useCallback((updatedTools: CatalogMcpTool[]) => {
+  const handleToolStateSaveComplete = React.useCallback((_updatedTools: CatalogMcpTool[]) => {
     // Force a refresh by triggering a re-fetch
     // The useCatalogEntities hook will automatically refetch when dependencies change
     // For now, we'll rely on the component re-rendering after save
     window.location.reload(); // Simple approach - could be optimized with state management
   }, []);
-  
+
   const batchToolState = useBatchToolState(serverTools, handleToolStateSaveComplete);
-  
+
   // Handle tool toggle for batch editing
-  const handleToolToggle = React.useCallback((tool: CatalogMcpTool) => {
-    batchToolState.toggleTool(tool);
-  }, [batchToolState]);
-  
+  const handleToolToggle = React.useCallback(
+    (tool: CatalogMcpTool) => {
+      batchToolState.toggleTool(tool);
+    },
+    [batchToolState],
+  );
+
   // Handle save
   const handleSave = React.useCallback(async () => {
     await batchToolState.save();
   }, [batchToolState]);
-  
+
   // Handle cancel
   const handleCancel = React.useCallback(() => {
     batchToolState.cancel();
@@ -150,7 +157,7 @@ const McpServerPage: React.FC = () => {
   }
 
   // Determine offline status
-  const isOffline = false; 
+  const isOffline = false;
 
   return (
     <>
@@ -165,7 +172,7 @@ const McpServerPage: React.FC = () => {
           <OfflineIndicator isOffline={isOffline} />
         </div>
       </PageSection>
-      
+
       <PageSection>
         <Card>
           <CardBody>
@@ -179,7 +186,9 @@ const McpServerPage: React.FC = () => {
               </DescriptionListGroup>
               <DescriptionListGroup>
                 <DescriptionListTerm>Namespace</DescriptionListTerm>
-                <DescriptionListDescription>{server.metadata.namespace || 'default'}</DescriptionListDescription>
+                <DescriptionListDescription>
+                  {server.metadata.namespace || 'default'}
+                </DescriptionListDescription>
               </DescriptionListGroup>
               <DescriptionListGroup>
                 <DescriptionListTerm>Type</DescriptionListTerm>
@@ -198,7 +207,7 @@ const McpServerPage: React.FC = () => {
               <DescriptionListGroup>
                 <DescriptionListTerm>Transport</DescriptionListTerm>
                 <DescriptionListDescription>
-                  {server.spec.transport?.type || 'Unknown'} 
+                  {server.spec.transport?.type || 'Unknown'}
                   {server.spec.transport?.url && ` (${server.spec.transport.url})`}
                 </DescriptionListDescription>
               </DescriptionListGroup>
@@ -214,13 +223,11 @@ const McpServerPage: React.FC = () => {
               Provided Tools ({serverTools.length})
             </Title>
             {serverTools.length === 0 ? (
-               <EmptyState variant="xs" icon={WrenchIcon}>
+              <EmptyState variant="xs" icon={WrenchIcon}>
                 <Title headingLevel="h4" size="md">
                   No tools available
                 </Title>
-                <EmptyStateBody>
-                  This server does not currently provide any tools.
-                </EmptyStateBody>
+                <EmptyStateBody>This server does not currently provide any tools.</EmptyStateBody>
               </EmptyState>
             ) : (
               <>
@@ -230,13 +237,17 @@ const McpServerPage: React.FC = () => {
                     variant="danger"
                     title="Failed to save tool state changes"
                     isInline
-                    actionClose={<Button variant="plain" onClick={batchToolState.clearError}>×</Button>}
+                    actionClose={
+                      <Button variant="plain" onClick={batchToolState.clearError}>
+                        ×
+                      </Button>
+                    }
                     style={{ marginBottom: '1rem' }}
                   >
                     {batchToolState.error.message}
                   </Alert>
                 )}
-                
+
                 {/* Save/Cancel buttons for batch editing */}
                 {authLoaded && canEditToolStates && (
                   <Flex
@@ -267,13 +278,14 @@ const McpServerPage: React.FC = () => {
                     {batchToolState.hasChanges() && (
                       <FlexItem>
                         <span style={{ fontSize: '0.875rem', color: '#6a6e73' }}>
-                          {batchToolState.pendingChanges.size} change{batchToolState.pendingChanges.size !== 1 ? 's' : ''} pending
+                          {batchToolState.pendingChanges.size} change
+                          {batchToolState.pendingChanges.size !== 1 ? 's' : ''} pending
                         </span>
                       </FlexItem>
                     )}
                   </Flex>
                 )}
-                
+
                 <Table aria-label="Provided Tools Table" variant="compact">
                   <Thead>
                     <Tr>
@@ -286,21 +298,28 @@ const McpServerPage: React.FC = () => {
                   </Thead>
                   <Tbody>
                     {serverTools.map((tool: CatalogMcpTool, index: number) => {
-                      const currentDisabledState = authLoaded && canEditToolStates 
-                        ? batchToolState.getToolState(tool)
-                        : isToolDisabled(tool);
-                      const rowStyle = currentDisabledState ? { opacity: 0.6, backgroundColor: '#f5f5f5' } : undefined;
-                      
+                      const currentDisabledState =
+                        authLoaded && canEditToolStates
+                          ? batchToolState.getToolState(tool)
+                          : isToolDisabled(tool);
+                      const rowStyle = currentDisabledState
+                        ? { opacity: 0.6, backgroundColor: '#f5f5f5' }
+                        : undefined;
+
                       // Create tool with current state for DisabledCheckbox
                       // Use destructuring to ensure React sees new object reference
                       // See CHECKBOX-UI-FIX.md for why we use this pattern instead of delete
                       const baseAnnotations = { ...tool.metadata.annotations };
-                      const { 'mcp-catalog.io/disabled': _, ...annotationsWithoutDisabled } = baseAnnotations;
-                      
+                      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                      const {
+                        'mcp-catalog.io/disabled': _disabled,
+                        ...annotationsWithoutDisabled
+                      } = baseAnnotations;
+
                       const annotations = currentDisabledState
                         ? { ...annotationsWithoutDisabled, 'mcp-catalog.io/disabled': 'true' }
                         : annotationsWithoutDisabled;
-                      
+
                       const toolWithState: CatalogMcpTool = {
                         ...tool,
                         metadata: {
@@ -308,11 +327,11 @@ const McpServerPage: React.FC = () => {
                           annotations,
                         },
                       };
-                      
+
                       // Ensure all values are strings to avoid type errors
-                      const uidStr: string = String(tool.metadata.uid ?? '');
-                      const nameStr: string = String(tool.metadata.name ?? '');
-                      const fallbackKey: string = `tool-${index}`;
+                      const uidStr = String(tool.metadata.uid ?? '');
+                      const nameStr = String(tool.metadata.name ?? '');
+                      const fallbackKey = `tool-${index}`;
                       const toolKey: string = uidStr || nameStr || fallbackKey || `tool-${index}`;
                       const toolName: string = nameStr || '';
                       return (
@@ -325,7 +344,7 @@ const McpServerPage: React.FC = () => {
                                 const toolNamespace = String(tool.metadata.namespace || 'default');
                                 if (toolName) {
                                   history.push(
-                                    `/mcp-catalog/tools/${toolName}?namespace=${toolNamespace}`
+                                    `/mcp-catalog/tools/${toolName}?namespace=${toolNamespace}`,
                                   );
                                 }
                               }}
@@ -338,8 +357,8 @@ const McpServerPage: React.FC = () => {
                           <Td dataLabel="Owner">{String(tool.spec.owner || '')}</Td>
                           <Td dataLabel="Status">
                             {authLoaded && canEditToolStates ? (
-                              <DisabledCheckbox 
-                                tool={toolWithState} 
+                              <DisabledCheckbox
+                                tool={toolWithState}
                                 readOnly={false}
                                 onToggle={handleToolToggle}
                               />

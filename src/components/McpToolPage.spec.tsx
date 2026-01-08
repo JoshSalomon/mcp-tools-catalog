@@ -11,6 +11,15 @@ import { CatalogMcpWorkload } from '../models/CatalogMcpWorkload';
 jest.mock('../services/catalogService', () => ({
   useCatalogEntity: jest.fn(),
   useCatalogEntities: jest.fn(),
+  useToolGuardrails: jest.fn(() => [[], true, null]),
+  useGuardrails: jest.fn(() => [[], true, null]),
+  attachGuardrailToTool: jest.fn(),
+  detachGuardrailFromTool: jest.fn(),
+}));
+
+// Mock the authService
+jest.mock('../services/authService', () => ({
+  useCanEditCatalog: jest.fn(() => ({ canEdit: false, loaded: true })),
 }));
 
 // Mock the performanceMonitor
@@ -68,9 +77,7 @@ const mockWorkload: CatalogMcpWorkload = {
     owner: 'ops-team',
     consumes: ['component:default/create-issue'],
   },
-  relations: [
-    { type: 'dependsOn', targetRef: 'component:default/create-issue' },
-  ],
+  relations: [{ type: 'dependsOn', targetRef: 'component:default/create-issue' }],
 };
 
 const renderWithRouter = (initialPath: string) => {
@@ -79,7 +86,7 @@ const renderWithRouter = (initialPath: string) => {
       <Route path="/mcp-catalog/tools/:name">
         <McpToolPage />
       </Route>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 };
 

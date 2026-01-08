@@ -74,14 +74,16 @@ interface EntitiesTestComponentProps {
 
 const EntitiesTestComponent: React.FC<EntitiesTestComponentProps> = ({ kind, type, namespace }) => {
   const [entities, loaded, error] = useCatalogEntities<MockEntity>(kind, type, namespace);
-  
+
   return (
     <div>
       <span data-testid="loaded">{loaded ? 'true' : 'false'}</span>
       <span data-testid="error">{error?.message || 'none'}</span>
       <span data-testid="count">{entities.length}</span>
       {entities.map((e, i) => (
-        <span key={i} data-testid={`entity-${i}`}>{e.metadata.name}</span>
+        <span key={i} data-testid={`entity-${i}`}>
+          {e.metadata.name}
+        </span>
       ))}
     </div>
   );
@@ -96,7 +98,7 @@ interface EntityTestComponentProps {
 
 const EntityTestComponent: React.FC<EntityTestComponentProps> = ({ kind, name, namespace }) => {
   const [entity, loaded, error] = useCatalogEntity<MockEntity>(kind, name, namespace);
-  
+
   return (
     <div>
       <span data-testid="loaded">{loaded ? 'true' : 'false'}</span>
@@ -147,7 +149,7 @@ describe('catalogService', () => {
         expect(screen.getByTestId('loaded').textContent).toBe('true');
       });
 
-      expect(screen.getByTestId('error').textContent).toContain('Failed to fetch catalog entities');
+      expect(screen.getByTestId('error').textContent).toContain('Failed to fetch entities');
     });
 
     it('handles 404 by returning empty array', async () => {
@@ -180,9 +182,11 @@ describe('catalogService', () => {
       });
 
       const calledUrl = mockFetch.mock.calls[0][0];
-      expect(calledUrl).toContain('filter=kind%3DComponent');
-      expect(calledUrl).toContain('filter=spec.type%3Dmcp-server');
-      expect(calledUrl).toContain('filter=metadata.namespace%3Dproduction');
+      // MCP Entity API uses dedicated endpoints per type with namespace query param
+      expect(calledUrl).toContain(
+        '/api/proxy/plugin/mcp-catalog/backstage/api/mcp-entity-api/servers',
+      );
+      expect(calledUrl).toContain('namespace=production');
     });
 
     it('handles response with items property', async () => {
@@ -230,7 +234,8 @@ describe('catalogService', () => {
     });
 
     it('handles entity not found (404)', async () => {
-      mockFetch.mockResolvedValueOnce({
+      // MCP Entity API tries multiple endpoints - mock all returning 404
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 404,
         statusText: 'Not Found',
@@ -259,7 +264,7 @@ describe('catalogService', () => {
         expect(screen.getByTestId('loaded').textContent).toBe('true');
       });
 
-      expect(screen.getByTestId('error').textContent).toContain('Failed to fetch catalog entity');
+      expect(screen.getByTestId('error').textContent).toContain('Failed to fetch entity');
     });
 
     it('skips fetching for placeholder names', async () => {
@@ -297,7 +302,9 @@ describe('catalogService', () => {
       });
 
       const calledUrl = mockFetch.mock.calls[0][0];
-      expect(calledUrl).toContain('/entities/by-name/Component/production/github-mcp');
+      // MCP Entity API uses dedicated endpoints: /servers/:namespace/:name, /tools/:namespace/:name, etc.
+      expect(calledUrl).toContain('/api/proxy/plugin/mcp-catalog/backstage/api/mcp-entity-api/');
+      expect(calledUrl).toContain('/production/github-mcp');
     });
   });
 });

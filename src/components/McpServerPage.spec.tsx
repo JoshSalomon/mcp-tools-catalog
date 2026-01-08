@@ -94,7 +94,7 @@ const renderWithRouter = (initialPath: string) => {
       <Route path="/mcp-catalog/servers/:name">
         <McpServerPage />
       </Route>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 };
 
@@ -189,7 +189,9 @@ describe('McpServerPage', () => {
     renderWithRouter('/mcp-catalog/servers/github-mcp');
 
     expect(screen.getByText('No tools available')).toBeInTheDocument();
-    expect(screen.getByText('This server does not currently provide any tools.')).toBeInTheDocument();
+    expect(
+      screen.getByText('This server does not currently provide any tools.'),
+    ).toBeInTheDocument();
   });
 
   it('renders breadcrumb navigation', () => {
@@ -210,8 +212,8 @@ describe('McpServerPage', () => {
 
     // Check the table column headers exist
     const headers = screen.getAllByRole('columnheader');
-    const headerTexts = headers.map(h => h.textContent);
-    
+    const headerTexts = headers.map((h) => h.textContent);
+
     expect(headerTexts).toContain('Name');
     expect(headerTexts).toContain('Type');
     expect(headerTexts).toContain('Lifecycle');

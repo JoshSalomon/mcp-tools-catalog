@@ -22,7 +22,12 @@ import { WrenchIcon, SearchIcon } from '@patternfly/react-icons';
 import { filterResources } from '../services/searchService';
 import { usePerformanceMonitor } from '../utils/performanceMonitor';
 import { Pagination } from './shared/Pagination';
-import { CatalogMcpTool, CATALOG_MCP_TOOL_KIND, CATALOG_MCP_TOOL_TYPE, isToolDisabled } from '../models/CatalogMcpTool';
+import {
+  CatalogMcpTool,
+  CATALOG_MCP_TOOL_KIND,
+  CATALOG_MCP_TOOL_TYPE,
+  isToolDisabled,
+} from '../models/CatalogMcpTool';
 import { useCatalogEntities } from '../services/catalogService';
 import { getEntityName } from '../utils/hierarchicalNaming';
 import { DisabledBadge } from './shared/DisabledBadge';
@@ -39,7 +44,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
   const [isServerFilterOpen, setIsServerFilterOpen] = React.useState(false);
   const [page, setPage] = React.useState(1);
   const [perPage, setPerPage] = React.useState(100);
-  
+
   // Sync with parent search term
   React.useEffect(() => {
     setSearchTerm(initialSearch);
@@ -51,7 +56,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
   // Fetch MCP tool entities from Backstage Catalog
   const [allEntities, toolsLoaded, toolsError] = useCatalogEntities<CatalogMcpTool>(
     CATALOG_MCP_TOOL_KIND,
-    CATALOG_MCP_TOOL_TYPE
+    CATALOG_MCP_TOOL_TYPE,
   );
 
   // Server names are extracted from tools themselves, no need to fetch servers separately
@@ -66,16 +71,14 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
   // Also check label mcp-catalog.io/type === 'tool' as fallback
   const tools = React.useMemo(() => {
     if (!allEntities || allEntities.length === 0) return [];
-    
-    return allEntities.filter(entity => {
+
+    return allEntities.filter((entity) => {
       const entityType = entity.spec?.type || '';
       const labelType = entity.metadata.labels?.['mcp-catalog.io/type'] || '';
-      
+
       // Check spec.type: 'mcp-tool' or 'tool'
       // Also check label as fallback
-      return entityType === 'mcp-tool' || 
-             entityType === 'tool' ||
-             labelType === 'tool';
+      return entityType === 'mcp-tool' || entityType === 'tool' || labelType === 'tool';
     });
   }, [allEntities]);
 
@@ -86,7 +89,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
     if (tool.spec.subcomponentOf) {
       return getEntityName(tool.spec.subcomponentOf);
     }
-    
+
     // Check spec.partOf (Component to System, but might be used)
     if (tool.spec.partOf) {
       const partOf = Array.isArray(tool.spec.partOf) ? tool.spec.partOf[0] : tool.spec.partOf;
@@ -94,20 +97,20 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
         return getEntityName(partOf);
       }
     }
-    
+
     // Check relations array for partOf type (generated from subcomponentOf)
     if (tool.relations) {
-      const partOfRelation = tool.relations.find(rel => rel.type === 'partOf');
+      const partOfRelation = tool.relations.find((rel) => rel.type === 'partOf');
       if (partOfRelation?.targetRef) {
         return getEntityName(partOfRelation.targetRef);
       }
     }
-    
+
     // Fallback to spec.mcp.server (legacy)
     if (tool.spec.mcp?.server) {
       return getEntityName(tool.spec.mcp.server);
     }
-    
+
     // Fallback to label
     return tool.metadata.labels?.['mcp-catalog.io/server'] || 'Unknown';
   };
@@ -115,14 +118,14 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
   // Filter tools by search term and server
   const filteredTools = React.useMemo(() => {
     let result = filterResources(tools || [], searchTerm);
-    
+
     if (serverFilter) {
-      result = result.filter(tool => {
+      result = result.filter((tool) => {
         const toolServerName = getToolServerName(tool);
         return toolServerName === serverFilter;
       });
     }
-    
+
     return result;
   }, [tools, searchTerm, serverFilter]);
 
@@ -154,7 +157,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
   // Get unique server names for filter dropdown
   const serverNames = React.useMemo(() => {
     const names = new Set<string>();
-    tools?.forEach(tool => {
+    tools?.forEach((tool) => {
       const serverName = getToolServerName(tool);
       if (serverName && serverName !== 'Unknown') {
         names.add(serverName);
@@ -215,7 +218,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
                       <MenuItem onClick={() => onServerFilterSelect('All Servers')}>
                         All Servers
                       </MenuItem>
-                      {serverNames.map(serverName => (
+                      {serverNames.map((serverName) => (
                         <MenuItem key={serverName} onClick={() => onServerFilterSelect(serverName)}>
                           {serverName}
                         </MenuItem>
@@ -225,8 +228,8 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
                 </Menu>
               }
             >
-              <Button 
-                variant="secondary" 
+              <Button
+                variant="secondary"
                 onClick={onServerFilterToggle}
                 aria-label={`Filter by server: ${serverFilter || 'All servers'}`}
                 aria-expanded={isServerFilterOpen}
@@ -275,7 +278,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
           <Tbody>
             {paginatedTools.map((tool) => {
               const serverName = getToolServerName(tool);
-              
+
               return (
                 <Tr key={tool.metadata.uid || `${tool.metadata.namespace}/${tool.metadata.name}`}>
                   <Td dataLabel="Name">
@@ -284,7 +287,9 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
                       onClick={(e) => {
                         e.preventDefault();
                         history.push(
-                          `/mcp-catalog/tools/${tool.metadata.name}?namespace=${tool.metadata.namespace || 'default'}`
+                          `/mcp-catalog/tools/${tool.metadata.name}?namespace=${
+                            tool.metadata.namespace || 'default'
+                          }`,
                         );
                       }}
                     >
@@ -300,7 +305,9 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
                         onClick={(e) => {
                           e.preventDefault();
                           history.push(
-                            `/mcp-catalog/servers/${serverName}?namespace=${tool.metadata.namespace || 'default'}`
+                            `/mcp-catalog/servers/${serverName}?namespace=${
+                              tool.metadata.namespace || 'default'
+                            }`,
                           );
                         }}
                       >
@@ -313,7 +320,10 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ initialSearch = '' }) => {
                   <Td dataLabel="Lifecycle">{tool.spec.lifecycle}</Td>
                   <Td dataLabel="Owner">{tool.spec.owner}</Td>
                   <Td dataLabel="Status">
-                    <DisabledBadge isDisabled={isToolDisabled(tool)} toolName={tool.metadata.name} />
+                    <DisabledBadge
+                      isDisabled={isToolDisabled(tool)}
+                      toolName={tool.metadata.name}
+                    />
                   </Td>
                 </Tr>
               );

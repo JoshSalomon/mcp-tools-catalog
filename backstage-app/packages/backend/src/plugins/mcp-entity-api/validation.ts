@@ -12,6 +12,7 @@ import type {
   MCPServerInput,
   MCPToolInput,
   MCPWorkloadInput,
+  CreateGuardrailInput,
   MCPEntityType,
 } from './types';
 
@@ -177,6 +178,66 @@ const mcpWorkloadSchema = {
   additionalProperties: false,
 };
 
+/**
+ * Guardrail metadata schema with stricter validation than generic entities.
+ * - name: 1-63 chars, lowercase alphanumeric + hyphens
+ * - description: required, max 1000 chars
+ */
+const guardrailMetadataSchema = {
+  type: 'object',
+  required: ['name', 'description'],
+  properties: {
+    name: {
+      type: 'string',
+      pattern: '^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$',
+      minLength: 1,
+      maxLength: 63,
+    },
+    namespace: {
+      type: 'string',
+      default: 'default',
+    },
+    description: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 1000,
+    },
+  },
+  additionalProperties: false,
+};
+
+/**
+ * MCP Guardrail schema (T026-T028)
+ * Validates guardrail creation input with specific constraints.
+ */
+const mcpGuardrailSchema = {
+  type: 'object',
+  required: ['metadata', 'spec'],
+  properties: {
+    metadata: guardrailMetadataSchema,
+    spec: {
+      type: 'object',
+      required: ['deployment'],
+      properties: {
+        deployment: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 2000,
+        },
+        parameters: {
+          type: 'string',
+          maxLength: 10000,
+        },
+        disabled: {
+          type: 'boolean',
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  additionalProperties: false,
+};
+
 // =============================================================================
 // Validator Class
 // =============================================================================
@@ -200,6 +261,7 @@ export class MCPEntityValidator {
       ['mcp-server', this.ajv.compile(mcpServerSchema)],
       ['mcp-tool', this.ajv.compile(mcpToolSchema)],
       ['mcp-workload', this.ajv.compile(mcpWorkloadSchema)],
+      ['mcp-guardrail', this.ajv.compile(mcpGuardrailSchema)],
     ]);
   }
 
@@ -222,6 +284,13 @@ export class MCPEntityValidator {
    */
   validateWorkload(input: unknown): asserts input is MCPWorkloadInput {
     this.validate('mcp-workload', input);
+  }
+
+  /**
+   * Validate an MCP Guardrail input (T026-T028)
+   */
+  validateGuardrail(input: unknown): asserts input is CreateGuardrailInput {
+    this.validate('mcp-guardrail', input);
   }
 
   /**

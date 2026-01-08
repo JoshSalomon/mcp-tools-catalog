@@ -35,19 +35,19 @@ export interface BatchToolState {
 
 /**
  * Hook to manage batch tool state changes with Save/Cancel workflow.
- * 
+ *
  * @param tools - Array of tools to manage
  * @param onSaveComplete - Optional callback when save completes successfully
  * @returns State and actions for batch tool state management
  */
 export const useBatchToolState = (
   tools: CatalogMcpTool[],
-  onSaveComplete?: (updatedTools: CatalogMcpTool[]) => void
+  onSaveComplete?: (updatedTools: CatalogMcpTool[]) => void,
 ): BatchToolState => {
   // Initialize original states from current tool states
   const [originalStates] = useState<Map<string, boolean>>(() => {
     const states = new Map<string, boolean>();
-    tools.forEach(tool => {
+    tools.forEach((tool) => {
       const entityRef = `component:${tool.metadata.namespace || 'default'}/${tool.metadata.name}`;
       states.set(entityRef, isToolDisabled(tool));
     });
@@ -58,20 +58,24 @@ export const useBatchToolState = (
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const toggleTool = useCallback((tool: CatalogMcpTool) => {
-    const entityRef = `component:${tool.metadata.namespace || 'default'}/${tool.metadata.name}`;
-    
-    setPendingChanges(prev => {
-      // Access current state inside setter to avoid unstable callback dependency
-      // See CHECKBOX-UI-FIX.md for explanation
-      const currentState = prev.get(entityRef) ?? originalStates.get(entityRef) ?? isToolDisabled(tool);
-      const newState = !currentState;
-      const updated = new Map(prev);
-      updated.set(entityRef, newState);
-      return updated;
-    });
-    setError(null);
-  }, [originalStates]); // ✅ Only depends on stable originalStates
+  const toggleTool = useCallback(
+    (tool: CatalogMcpTool) => {
+      const entityRef = `component:${tool.metadata.namespace || 'default'}/${tool.metadata.name}`;
+
+      setPendingChanges((prev) => {
+        // Access current state inside setter to avoid unstable callback dependency
+        // See CHECKBOX-UI-FIX.md for explanation
+        const currentState =
+          prev.get(entityRef) ?? originalStates.get(entityRef) ?? isToolDisabled(tool);
+        const newState = !currentState;
+        const updated = new Map(prev);
+        updated.set(entityRef, newState);
+        return updated;
+      });
+      setError(null);
+    },
+    [originalStates],
+  ); // ✅ Only depends on stable originalStates
 
   const save = useCallback(async () => {
     if (pendingChanges.size === 0) {
@@ -83,15 +87,15 @@ export const useBatchToolState = (
 
     try {
       const updatedTools = await batchUpdateToolStates(pendingChanges);
-      
+
       // Update original states to reflect saved changes
       pendingChanges.forEach((newState, entityRef) => {
         originalStates.set(entityRef, newState);
       });
-      
+
       // Clear pending changes
       setPendingChanges(new Map());
-      
+
       if (onSaveComplete) {
         onSaveComplete(updatedTools);
       }
@@ -115,14 +119,17 @@ export const useBatchToolState = (
     return pendingChanges.size > 0;
   }, [pendingChanges]);
 
-  const getToolState = useCallback((tool: CatalogMcpTool): boolean => {
-    const entityRef = `component:${tool.metadata.namespace || 'default'}/${tool.metadata.name}`;
-    // Return pending change if exists, otherwise return original state
-    if (pendingChanges.has(entityRef)) {
-      return pendingChanges.get(entityRef)!;
-    }
-    return originalStates.get(entityRef) ?? isToolDisabled(tool);
-  }, [pendingChanges, originalStates]);
+  const getToolState = useCallback(
+    (tool: CatalogMcpTool): boolean => {
+      const entityRef = `component:${tool.metadata.namespace || 'default'}/${tool.metadata.name}`;
+      // Return pending change if exists, otherwise return original state
+      if (pendingChanges.has(entityRef)) {
+        return pendingChanges.get(entityRef)!;
+      }
+      return originalStates.get(entityRef) ?? isToolDisabled(tool);
+    },
+    [pendingChanges, originalStates],
+  );
 
   return {
     pendingChanges,

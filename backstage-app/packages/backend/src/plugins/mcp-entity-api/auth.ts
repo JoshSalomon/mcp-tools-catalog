@@ -106,6 +106,7 @@ const ENTITY_TYPE_TO_RESOURCE: Record<MCPEntityType, string> = {
   'mcp-server': 'mcpservers',
   'mcp-tool': 'mcptools',
   'mcp-workload': 'mcpworkloads',
+  'mcp-guardrail': 'mcpguardrails',
 };
 
 /**
@@ -227,6 +228,8 @@ export function getRoleRequirement(
       return config.roles.tool;
     case 'mcp-workload':
       return config.roles.workload;
+    case 'mcp-guardrail':
+      return config.roles.guardrail;
     default:
       // TypeScript exhaustive check
       const _exhaustive: never = entityType;

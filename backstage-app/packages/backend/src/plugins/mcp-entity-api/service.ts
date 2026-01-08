@@ -16,7 +16,7 @@ import {
   ConflictError,
   ValidationError,
 } from './errors';
-import { buildEntityRef } from './validation';
+import { buildEntityRef, validator } from './validation';
 import { MCPEntityDatabase } from './database';
 import { MCPEntityProvider } from './entityProvider';
 import type {
@@ -28,6 +28,13 @@ import type {
   MCPWorkloadEntity,
   EntityListResponse,
   EntityListParams,
+  Guardrail,
+  GuardrailWithUsage,
+  CreateGuardrailInput,
+  UpdateGuardrailInput,
+  AttachGuardrailInput,
+  ToolGuardrailAssociation,
+  WorkloadToolGuardrailAssociation,
 } from './types';
 
 export interface MCPEntityServiceOptions {
@@ -781,5 +788,588 @@ export class MCPEntityService {
         mcp: input.spec.mcp,
       },
     };
+  }
+
+  // ===========================================================================
+  // Guardrail Operations (Database-Only - 006-mcp-guardrails)
+  // ===========================================================================
+  //
+  // Guardrails are stored exclusively in the local database.
+  // No catalog lookup, no merge logic.
+  // Guardrails can be attached to tools and workload-tool relationships.
+
+  /**
+   * List all guardrails with optional filtering
+   */
+  async listGuardrails(params?: { namespace?: string; limit?: number; offset?: number }): Promise<{ items: Guardrail[]; totalCount: number }> {
+    this.logger.debug('Listing guardrails', { params });
+    return this.database.listGuardrails(params);
+  }
+
+  /**
+   * Get a single guardrail by namespace and name with usage information
+   */
+  async getGuardrail(namespace: string, name: string): Promise<GuardrailWithUsage> {
+    this.logger.debug('Getting guardrail', { namespace, name });
+
+    const guardrail = await this.database.getGuardrailWithUsage(namespace, name);
+    if (!guardrail) {
+      throw new NotFoundError(`guardrail:${namespace}/${name}`);
+    }
+
+    return guardrail;
+  }
+
+  /**
+   * Create a new guardrail
+   */
+  async createGuardrail(input: CreateGuardrailInput): Promise<Guardrail> {
+    this.logger.info('Creating guardrail', { name: input.metadata?.name });
+
+    // Validate input (T026-T028)
+    validator.validateGuardrail(input);
+
+    const namespace = input.metadata.namespace || 'default';
+
+    // Check uniqueness
+    const exists = await this.database.guardrailExists(namespace, input.metadata.name);
+    if (exists) {
+      throw new ConflictError(`guardrail:${namespace}/${input.metadata.name}`);
+    }
+
+    const guardrail = await this.database.createGuardrail({
+      namespace,
+      name: input.metadata.name,
+      description: input.metadata.description,
+      deployment: input.spec.deployment,
+      parameters: input.spec.parameters,
+      disabled: input.spec.disabled,
+    });
+
+    this.logger.info('Guardrail created', { id: guardrail.id, namespace, name: input.metadata.name });
+    return guardrail;
+  }
+
+  /**
+   * Update an existing guardrail
+   */
+  async updateGuardrail(
+    namespace: string,
+    name: string,
+    input: UpdateGuardrailInput,
+  ): Promise<Guardrail> {
+    this.logger.info('Updating guardrail', { namespace, name });
+
+    // Check if renaming and new name already exists
+    if (input.metadata?.name && input.metadata.name !== name) {
+      const exists = await this.database.guardrailExists(namespace, input.metadata.name);
+      if (exists) {
+        throw new ConflictError(`guardrail:${namespace}/${input.metadata.name}`);
+      }
+    }
+
+    const updated = await this.database.updateGuardrail(namespace, name, {
+      name: input.metadata?.name,
+      description: input.metadata?.description,
+      deployment: input.spec?.deployment,
+      parameters: input.spec?.parameters,
+      disabled: input.spec?.disabled,
+    });
+
+    if (!updated) {
+      throw new NotFoundError(`guardrail:${namespace}/${name}`);
+    }
+
+    this.logger.info('Guardrail updated', { namespace, name });
+    return updated;
+  }
+
+  /**
+   * Delete a guardrail (fails if has associations)
+   */
+  async deleteGuardrail(namespace: string, name: string): Promise<void> {
+    this.logger.info('Deleting guardrail', { namespace, name });
+
+    const result = await this.database.deleteGuardrail(namespace, name);
+
+    if (!result.deleted) {
+      if (result.error === 'Guardrail not found') {
+        throw new NotFoundError(`guardrail:${namespace}/${name}`);
+      }
+      // Has associations - throw conflict error
+      throw new ConflictError(result.error || 'Cannot delete guardrail');
+    }
+
+    this.logger.info('Guardrail deleted', { namespace, name });
+  }
+
+  /**
+   * Set guardrail disabled state
+   */
+  async setGuardrailDisabled(namespace: string, name: string, disabled: boolean): Promise<Guardrail> {
+    this.logger.info('Setting guardrail disabled state', { namespace, name, disabled });
+
+    const updated = await this.database.setGuardrailDisabled(namespace, name, disabled);
+
+    if (!updated) {
+      throw new NotFoundError(`guardrail:${namespace}/${name}`);
+    }
+
+    this.logger.info('Guardrail disabled state updated', { namespace, name, disabled });
+    return updated;
+  }
+
+  // ===========================================================================
+  // Tool-Guardrail Association Operations (US3)
+  // ===========================================================================
+
+  /**
+   * List all guardrails attached to a tool
+   */
+  async listToolGuardrails(toolNamespace: string, toolName: string): Promise<ToolGuardrailAssociation[]> {
+    this.logger.debug('Listing tool guardrails', { toolNamespace, toolName });
+
+    // Verify tool exists (in catalog)
+    const tool = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace: toolNamespace,
+      name: toolName,
+    });
+    if (!tool || (tool.spec as any)?.type !== 'mcp-tool') {
+      throw new NotFoundError(`component:${toolNamespace}/${toolName}`);
+    }
+
+    return this.database.listToolGuardrails(toolNamespace, toolName);
+  }
+
+  /**
+   * Attach a guardrail to a tool
+   */
+  async attachGuardrailToTool(
+    toolNamespace: string,
+    toolName: string,
+    input: AttachGuardrailInput,
+  ): Promise<ToolGuardrailAssociation> {
+    this.logger.info('Attaching guardrail to tool', { toolNamespace, toolName, input });
+
+    // Verify tool exists (in catalog)
+    const tool = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace: toolNamespace,
+      name: toolName,
+    });
+    if (!tool || (tool.spec as any)?.type !== 'mcp-tool') {
+      throw new NotFoundError(`component:${toolNamespace}/${toolName}`);
+    }
+
+    // Verify guardrail exists
+    const guardrail = await this.database.getGuardrail(input.guardrailNamespace, input.guardrailName);
+    if (!guardrail) {
+      throw new NotFoundError(`guardrail:${input.guardrailNamespace}/${input.guardrailName}`);
+    }
+
+    // Check for duplicate
+    const exists = await this.database.toolGuardrailExists(toolNamespace, toolName, guardrail.id);
+    if (exists) {
+      throw new ConflictError(
+        `Guardrail '${input.guardrailNamespace}/${input.guardrailName}' is already attached to tool '${toolNamespace}/${toolName}'`,
+      );
+    }
+
+    const association = await this.database.attachGuardrailToTool(
+      toolNamespace,
+      toolName,
+      guardrail.id,
+      input.executionTiming,
+      input.parameters,
+    );
+
+    this.logger.info('Guardrail attached to tool', { toolNamespace, toolName, guardrailId: guardrail.id, hasParameters: !!input.parameters });
+    return association;
+  }
+
+  /**
+   * Detach a guardrail from a tool
+   */
+  async detachGuardrailFromTool(
+    toolNamespace: string,
+    toolName: string,
+    guardrailNamespace: string,
+    guardrailName: string,
+  ): Promise<void> {
+    this.logger.info('Detaching guardrail from tool', { toolNamespace, toolName, guardrailNamespace, guardrailName });
+
+    // Verify tool exists (in catalog)
+    const tool = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace: toolNamespace,
+      name: toolName,
+    });
+    if (!tool || (tool.spec as any)?.type !== 'mcp-tool') {
+      throw new NotFoundError(`component:${toolNamespace}/${toolName}`);
+    }
+
+    // Verify guardrail exists
+    const guardrail = await this.database.getGuardrail(guardrailNamespace, guardrailName);
+    if (!guardrail) {
+      throw new NotFoundError(`guardrail:${guardrailNamespace}/${guardrailName}`);
+    }
+
+    // Check if association exists
+    const exists = await this.database.toolGuardrailExists(toolNamespace, toolName, guardrail.id);
+    if (!exists) {
+      throw new NotFoundError(
+        `Guardrail '${guardrailNamespace}/${guardrailName}' is not attached to tool '${toolNamespace}/${toolName}'`,
+      );
+    }
+
+    await this.database.detachGuardrailFromTool(toolNamespace, toolName, guardrail.id);
+    this.logger.info('Guardrail detached from tool', { toolNamespace, toolName, guardrailId: guardrail.id });
+  }
+
+  // ===========================================================================
+  // Workload-Tool-Guardrail Association Operations (US4)
+  // ===========================================================================
+
+  /**
+   * List all guardrails for a workload-tool relationship.
+   * This merges:
+   * - Guardrails inherited from tool-level (source='tool')
+   * - Guardrails added at workload-tool level (source='workload')
+   */
+  async listWorkloadToolGuardrails(
+    workloadNamespace: string,
+    workloadName: string,
+    toolNamespace: string,
+    toolName: string,
+  ): Promise<WorkloadToolGuardrailAssociation[]> {
+    this.logger.debug('Listing workload-tool guardrails', {
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+    });
+
+    // Verify workload exists (in database)
+    const workload = await this.database.getEntityByName(workloadNamespace, workloadName);
+    const validTypes = ['mcp-workload', 'service', 'workflow'];
+    if (!workload || !validTypes.includes((workload.spec as any)?.type)) {
+      throw new NotFoundError(`component:${workloadNamespace}/${workloadName}`);
+    }
+
+    // Verify tool exists (in catalog)
+    const tool = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace: toolNamespace,
+      name: toolName,
+    });
+    if (!tool || (tool.spec as any)?.type !== 'mcp-tool') {
+      throw new NotFoundError(`component:${toolNamespace}/${toolName}`);
+    }
+
+    // Get guardrails added directly at workload-tool level (source='workload')
+    const workloadLevelGuardrails = await this.database.listWorkloadToolGuardrails(
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+    );
+
+    // Get guardrails inherited from tool level (source='tool')
+    const toolLevelGuardrails = await this.database.listToolGuardrails(toolNamespace, toolName);
+
+    // Convert tool-level guardrails to workload-tool format with source='tool'
+    const inheritedGuardrails: WorkloadToolGuardrailAssociation[] = toolLevelGuardrails.map(tg => ({
+      id: `inherited-${tg.id}`,
+      workloadNamespace,
+      workloadName,
+      toolNamespace: tg.toolNamespace,
+      toolName: tg.toolName,
+      guardrailId: tg.guardrailId,
+      guardrail: tg.guardrail,
+      executionTiming: tg.executionTiming,
+      source: 'tool' as const,
+      parameters: tg.parameters,
+      createdAt: tg.createdAt,
+    }));
+
+    // Merge: workload-level first, then inherited (to show workload additions prominently)
+    return [...workloadLevelGuardrails, ...inheritedGuardrails];
+  }
+
+  /**
+   * Add a guardrail to a workload-tool relationship
+   */
+  async addGuardrailToWorkloadTool(
+    workloadNamespace: string,
+    workloadName: string,
+    toolNamespace: string,
+    toolName: string,
+    input: AttachGuardrailInput,
+  ): Promise<WorkloadToolGuardrailAssociation> {
+    this.logger.info('Adding guardrail to workload-tool', {
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+      input,
+    });
+
+    // Verify workload exists (in database)
+    const workload = await this.database.getEntityByName(workloadNamespace, workloadName);
+    const validTypes = ['mcp-workload', 'service', 'workflow'];
+    if (!workload || !validTypes.includes((workload.spec as any)?.type)) {
+      throw new NotFoundError(`component:${workloadNamespace}/${workloadName}`);
+    }
+
+    // Verify tool exists (in catalog)
+    const tool = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace: toolNamespace,
+      name: toolName,
+    });
+    if (!tool || (tool.spec as any)?.type !== 'mcp-tool') {
+      throw new NotFoundError(`component:${toolNamespace}/${toolName}`);
+    }
+
+    // Verify guardrail exists
+    const guardrail = await this.database.getGuardrail(input.guardrailNamespace, input.guardrailName);
+    if (!guardrail) {
+      throw new NotFoundError(`guardrail:${input.guardrailNamespace}/${input.guardrailName}`);
+    }
+
+    // Check for duplicate
+    const exists = await this.database.workloadToolGuardrailExists(
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+      guardrail.id,
+    );
+    if (exists) {
+      throw new ConflictError(
+        `Guardrail '${input.guardrailNamespace}/${input.guardrailName}' is already attached to workload-tool '${workloadNamespace}/${workloadName}/${toolNamespace}/${toolName}'`,
+      );
+    }
+
+    const association = await this.database.addGuardrailToWorkloadTool(
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+      guardrail.id,
+      input.executionTiming,
+      'workload', // Added at workload level
+      input.parameters,
+    );
+
+    this.logger.info('Guardrail added to workload-tool', {
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+      guardrailId: guardrail.id,
+      hasParameters: !!input.parameters,
+    });
+
+    return association;
+  }
+
+  /**
+   * Remove a guardrail from a workload-tool relationship
+   */
+  async removeGuardrailFromWorkloadTool(
+    workloadNamespace: string,
+    workloadName: string,
+    toolNamespace: string,
+    toolName: string,
+    guardrailNamespace: string,
+    guardrailName: string,
+  ): Promise<void> {
+    this.logger.info('Removing guardrail from workload-tool', {
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+      guardrailNamespace,
+      guardrailName,
+    });
+
+    // Verify workload exists (in database)
+    const workload = await this.database.getEntityByName(workloadNamespace, workloadName);
+    const validTypes = ['mcp-workload', 'service', 'workflow'];
+    if (!workload || !validTypes.includes((workload.spec as any)?.type)) {
+      throw new NotFoundError(`component:${workloadNamespace}/${workloadName}`);
+    }
+
+    // Verify tool exists (in catalog)
+    const tool = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace: toolNamespace,
+      name: toolName,
+    });
+    if (!tool || (tool.spec as any)?.type !== 'mcp-tool') {
+      throw new NotFoundError(`component:${toolNamespace}/${toolName}`);
+    }
+
+    // Verify guardrail exists
+    const guardrail = await this.database.getGuardrail(guardrailNamespace, guardrailName);
+    if (!guardrail) {
+      throw new NotFoundError(`guardrail:${guardrailNamespace}/${guardrailName}`);
+    }
+
+    // Check if association exists
+    const exists = await this.database.workloadToolGuardrailExists(
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+      guardrail.id,
+    );
+    if (!exists) {
+      throw new NotFoundError(
+        `Guardrail '${guardrailNamespace}/${guardrailName}' is not attached to workload-tool '${workloadNamespace}/${workloadName}/${toolNamespace}/${toolName}'`,
+      );
+    }
+
+    await this.database.removeGuardrailFromWorkloadTool(
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+      guardrail.id,
+    );
+
+    this.logger.info('Guardrail removed from workload-tool', {
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+      guardrailId: guardrail.id,
+    });
+  }
+
+  /**
+   * Update a guardrail association in a workload-tool relationship
+   */
+  async updateWorkloadToolGuardrail(
+    workloadNamespace: string,
+    workloadName: string,
+    toolNamespace: string,
+    toolName: string,
+    guardrailNamespace: string,
+    guardrailName: string,
+    updates: { executionTiming?: 'pre-execution' | 'post-execution'; parameters?: string | null },
+  ): Promise<WorkloadToolGuardrailAssociation> {
+    this.logger.info('Updating workload-tool guardrail', {
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+      guardrailNamespace,
+      guardrailName,
+      updates,
+    });
+
+    // Verify workload exists (in database)
+    const workload = await this.database.getEntityByName(workloadNamespace, workloadName);
+    const validTypes = ['mcp-workload', 'service', 'workflow'];
+    if (!workload || !validTypes.includes((workload.spec as any)?.type)) {
+      throw new NotFoundError(`component:${workloadNamespace}/${workloadName}`);
+    }
+
+    // Verify tool exists (in catalog)
+    const tool = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace: toolNamespace,
+      name: toolName,
+    });
+    if (!tool || (tool.spec as any)?.type !== 'mcp-tool') {
+      throw new NotFoundError(`component:${toolNamespace}/${toolName}`);
+    }
+
+    // Verify guardrail exists
+    const guardrail = await this.database.getGuardrail(guardrailNamespace, guardrailName);
+    if (!guardrail) {
+      throw new NotFoundError(`guardrail:${guardrailNamespace}/${guardrailName}`);
+    }
+
+    // Update the association
+    const updated = await this.database.updateWorkloadToolGuardrail(
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+      guardrail.id,
+      updates,
+    );
+
+    if (!updated) {
+      throw new NotFoundError(
+        `Guardrail '${guardrailNamespace}/${guardrailName}' is not attached to workload-tool '${workloadNamespace}/${workloadName}/${toolNamespace}/${toolName}'`,
+      );
+    }
+
+    this.logger.info('Workload-tool guardrail updated', {
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+      guardrailId: guardrail.id,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Inherit tool guardrails to a workload-tool relationship
+   * Copies all guardrails attached to a tool to the workload-tool association
+   */
+  async inheritToolGuardrailsToWorkload(
+    workloadNamespace: string,
+    workloadName: string,
+    toolNamespace: string,
+    toolName: string,
+  ): Promise<WorkloadToolGuardrailAssociation[]> {
+    this.logger.info('Inheriting tool guardrails to workload', {
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+    });
+
+    // Verify workload exists (in database)
+    const workload = await this.database.getEntityByName(workloadNamespace, workloadName);
+    const validTypes = ['mcp-workload', 'service', 'workflow'];
+    if (!workload || !validTypes.includes((workload.spec as any)?.type)) {
+      throw new NotFoundError(`component:${workloadNamespace}/${workloadName}`);
+    }
+
+    // Verify tool exists (in catalog)
+    const tool = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace: toolNamespace,
+      name: toolName,
+    });
+    if (!tool || (tool.spec as any)?.type !== 'mcp-tool') {
+      throw new NotFoundError(`component:${toolNamespace}/${toolName}`);
+    }
+
+    const inherited = await this.database.inheritToolGuardrailsToWorkload(
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+    );
+
+    this.logger.info('Inherited tool guardrails', {
+      workloadNamespace,
+      workloadName,
+      toolNamespace,
+      toolName,
+      count: inherited.length,
+    });
+
+    return inherited;
   }
 }
