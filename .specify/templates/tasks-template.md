@@ -79,21 +79,39 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 1 (OPTIONAL - only if tests requested) ⚠️
+<!--
+  CONSTITUTION PRINCIPLE XII: Backend-First Implementation
 
-> **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
+  When a user story involves BOTH backend AND frontend work, split it into two sub-phases:
+  - Phase 3A: Backend Implementation (database, service, API, unit tests, API tests)
+  - Phase 3B: Frontend Implementation (components, hooks, UI integration)
 
-- [ ] T010 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T011 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
+  Phase 3A MUST pass all tests before Phase 3B begins.
+  If story is backend-only or frontend-only, use a single phase.
+-->
 
-### Implementation for User Story 1
+### Phase 3A: Backend Implementation (US1)
 
-- [ ] T012 [P] [US1] Create [Entity1] model in src/models/[entity1].py
-- [ ] T013 [P] [US1] Create [Entity2] model in src/models/[entity2].py
-- [ ] T014 [US1] Implement [Service] in src/services/[service].py (depends on T012, T013)
-- [ ] T015 [US1] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T016 [US1] Add validation and error handling
-- [ ] T017 [US1] Add logging for user story 1 operations
+> **⚠️ CRITICAL**: Complete and verify all backend tests before starting Phase 3B
+
+- [ ] T010 [P] [US1] Create [Entity1] model in backend/src/models/[entity1].py
+- [ ] T011 [P] [US1] Create [Entity2] model in backend/src/models/[entity2].py
+- [ ] T012 [US1] Implement [Service] in backend/src/services/[service].py
+- [ ] T013 [US1] Implement [endpoint] in backend/src/api/[endpoint].py
+- [ ] T014 [US1] Add validation and error handling
+- [ ] T015 [P] [US1] Unit tests for service in backend/tests/unit/test_[service].py
+- [ ] T016 [P] [US1] API/sanity tests in tests/sanity/[feature].sh
+
+**Checkpoint**: Backend tests MUST pass before proceeding to Phase 3B
+
+### Phase 3B: Frontend Implementation (US1)
+
+> **NOTE**: Only start after Phase 3A tests are verified passing
+
+- [ ] T017 [P] [US1] Create [Component] in frontend/src/components/[Component].tsx
+- [ ] T018 [P] [US1] Add API hooks in frontend/src/services/[service].ts
+- [ ] T019 [US1] Integrate with existing UI in frontend/src/pages/[Page].tsx
+- [ ] T020 [US1] Add frontend tests (if requested) in frontend/tests/[Component].spec.tsx
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -105,17 +123,28 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 2 (OPTIONAL - only if tests requested) ⚠️
+<!--
+  CONSTITUTION PRINCIPLE XII: Backend-First Implementation
+  Split into 4A (backend) and 4B (frontend) if story involves both.
+-->
 
-- [ ] T018 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T019 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
+### Phase 4A: Backend Implementation (US2)
 
-### Implementation for User Story 2
+> **⚠️ CRITICAL**: Complete and verify all backend tests before starting Phase 4B
 
-- [ ] T020 [P] [US2] Create [Entity] model in src/models/[entity].py
-- [ ] T021 [US2] Implement [Service] in src/services/[service].py
-- [ ] T022 [US2] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T023 [US2] Integrate with User Story 1 components (if needed)
+- [ ] T021 [P] [US2] Create [Entity] model in backend/src/models/[entity].py
+- [ ] T022 [US2] Implement [Service] in backend/src/services/[service].py
+- [ ] T023 [US2] Implement [endpoint] in backend/src/api/[endpoint].py
+- [ ] T024 [P] [US2] Unit tests for service in backend/tests/unit/test_[service].py
+- [ ] T025 [P] [US2] API/sanity tests in tests/sanity/[feature].sh
+
+**Checkpoint**: Backend tests MUST pass before proceeding to Phase 4B
+
+### Phase 4B: Frontend Implementation (US2)
+
+- [ ] T026 [P] [US2] Create [Component] in frontend/src/components/[Component].tsx
+- [ ] T027 [US2] Integrate with existing UI
+- [ ] T028 [US2] Integrate with User Story 1 components (if needed)
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
@@ -127,16 +156,27 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 3 (OPTIONAL - only if tests requested) ⚠️
+<!--
+  CONSTITUTION PRINCIPLE XII: Backend-First Implementation
+  Split into 5A (backend) and 5B (frontend) if story involves both.
+-->
 
-- [ ] T024 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T025 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
+### Phase 5A: Backend Implementation (US3)
 
-### Implementation for User Story 3
+> **⚠️ CRITICAL**: Complete and verify all backend tests before starting Phase 5B
 
-- [ ] T026 [P] [US3] Create [Entity] model in src/models/[entity].py
-- [ ] T027 [US3] Implement [Service] in src/services/[service].py
-- [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T029 [P] [US3] Create [Entity] model in backend/src/models/[entity].py
+- [ ] T030 [US3] Implement [Service] in backend/src/services/[service].py
+- [ ] T031 [US3] Implement [endpoint] in backend/src/api/[endpoint].py
+- [ ] T032 [P] [US3] Unit tests for service in backend/tests/unit/test_[service].py
+- [ ] T033 [P] [US3] API/sanity tests in tests/sanity/[feature].sh
+
+**Checkpoint**: Backend tests MUST pass before proceeding to Phase 5B
+
+### Phase 5B: Frontend Implementation (US3)
+
+- [ ] T034 [P] [US3] Create [Component] in frontend/src/components/[Component].tsx
+- [ ] T035 [US3] Integrate with existing UI
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -150,12 +190,20 @@ Examples of foundational tasks (adjust based on your project):
 
 **Purpose**: Improvements that affect multiple user stories
 
+<!--
+  CONSTITUTION PRINCIPLE XIII: Branch Documentation
+
+  The final phase MUST include creation of IMPLEMENTATION-SUMMARY.md documenting
+  what was accomplished in this branch. This is a required deliverable.
+-->
+
 - [ ] TXXX [P] Documentation updates in docs/
 - [ ] TXXX Code cleanup and refactoring
 - [ ] TXXX Performance optimization across all stories
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
 - [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
+- [ ] TXXX Create `specs/<branch-name>/IMPLEMENTATION-SUMMARY.md` documenting feature (REQUIRED per Constitution XIII)
 
 ---
 
@@ -249,3 +297,5 @@ With multiple developers:
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
 - Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence
+- **CONSTITUTION XII**: Full-stack stories MUST split into backend (A) and frontend (B) phases; backend tests MUST pass before frontend work begins
+- **CONSTITUTION XIII**: Polish phase MUST create `specs/<branch-name>/IMPLEMENTATION-SUMMARY.md` documenting the feature
