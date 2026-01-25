@@ -22,11 +22,43 @@ catalog:
   
   # Locations to import entities from
   locations:
-    # Load all YAML files from the catalog directory in the configured repo
+    # MCP Tools Catalog entities from GitHub (main branch)
     - type: url
-      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH}/entities/**/*.yaml
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/github-server.yaml
       rules:
-        - allow: [Component, Resource, System, Domain, API, Group, User, Location]
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/github-tools.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/kubernetes-server.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/kubernetes-tools.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/test1-server.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/test1-tools.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/test1-workload.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/multi-server-workloads.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/sample-guardrails.yaml
+      rules:
+        - allow: [Component]
 
   # Orphan cleanup strategy (removes entities when deleted from GitHub)
   orphanStrategy: delete
@@ -38,13 +70,20 @@ backend:
   # See DEPLOYMENT.md "TODO: Authentication Support" section.
   auth:
     dangerouslyDisableDefaultAuthPolicy: true
+  
+  # Allow reading from GitHub raw content URLs
+  reading:
+    allow:
+      - host: raw.githubusercontent.com
 
   # Database configuration for SQLite (PoC)
   # For production, switch to PostgreSQL - see backstage-deployment.yaml
+  # IMPORTANT: Use 'directory' (not ':memory:') to persist data across pod restarts.
+  # The directory must match the persistent volume mount path in backstage-deployment-sqlite.yaml
   database:
     client: better-sqlite3
     connection:
-      directory: /app/sqlite-data
+      directory: /app/sqlite-data  # Persistent volume mount - data survives pod restarts
 
   plugins:
     catalog:

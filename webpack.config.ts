@@ -1,7 +1,7 @@
 /* eslint-env node */
 
 import * as path from 'path';
-import { Configuration as WebpackConfiguration } from 'webpack';
+import { Configuration as WebpackConfiguration, DefinePlugin, ProvidePlugin } from 'webpack';
 import { Configuration as WebpackDevServerConfiguration } from 'webpack-dev-server';
 import { ConsoleRemotePlugin } from '@openshift-console/dynamic-plugin-sdk-webpack';
 
@@ -25,6 +25,14 @@ const config: Configuration = {
   },
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx'],
+    fallback: {
+      "path": require.resolve("path-browserify"),
+      "os": require.resolve("os-browserify/browser"),
+      "crypto": require.resolve("crypto-browserify"),
+      "stream": require.resolve("stream-browserify"),
+      "buffer": require.resolve("buffer/"),
+      "process": require.resolve("process/browser"),
+    }
   },
   module: {
     rules: [
@@ -77,6 +85,13 @@ const config: Configuration = {
     new ConsoleRemotePlugin(),
     new CopyWebpackPlugin({
       patterns: [{ from: path.resolve(__dirname, 'locales'), to: 'locales' }],
+    }),
+    new DefinePlugin({
+      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
+    }),
+    new ProvidePlugin({
+      process: 'process/browser',
+      Buffer: ['buffer', 'Buffer'],
     }),
   ],
   devtool: isProd ? false : 'source-map',

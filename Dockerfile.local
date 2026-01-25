@@ -10,7 +10,7 @@
 FROM registry.access.redhat.com/ubi9/nginx-120:latest
 
 # Copy pre-built artifacts from local dist directory
-COPY --chown=1001:1001 dist /usr/share/nginx/html
+COPY --chown=1001:1001 dist /opt/app-root/src
 
 USER 1001
 

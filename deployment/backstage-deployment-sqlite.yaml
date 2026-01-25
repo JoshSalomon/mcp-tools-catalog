@@ -1,5 +1,11 @@
 # Backstage deployment using SQLite with persistent storage (for PoC)
 # Backstage serves HTTP internally, nginx sidecar handles HTTPS for console plugin
+#
+# IMPORTANT: Database Persistence
+# - The database uses a PersistentVolumeClaim (backstage-sqlite-pvc) mounted at /app/sqlite-data
+# - The app-config.production.yaml ConfigMap MUST use 'directory: /app/sqlite-data' (NOT ':memory:')
+# - This ensures disabled flags, alternative descriptions, and all runtime data persist across pod restarts
+# - To create/update the ConfigMap: oc create configmap backstage-app-config --from-file=app-config.production.yaml=deployment/app-config.production.yaml -n backstage
 apiVersion: apps/v1
 kind: Deployment
 metadata:

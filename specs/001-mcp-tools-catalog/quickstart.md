@@ -105,8 +105,12 @@ For detailed configuration options, see [DEPLOYMENT.md](../../DEPLOYMENT.md#-con
 When you need to update the MCP Catalog console plugin, use the unified deployment script:
 
 ```bash
-# Full pipeline: build, push, deploy, and run sanity tests
+# Full pipeline: build, push, deploy, and run sanity tests (console plugin)
 ./build-push-deploy-test.sh
+
+# Target specific components:
+./build-push-deploy-test.sh --console-only   # Build/push/deploy console plugin only (default)
+./build-push-deploy-test.sh --backstage-only # Build/push/deploy backstage only
 
 # Common options:
 ./build-push-deploy-test.sh --skip-build    # Redeploy existing image
@@ -115,7 +119,7 @@ When you need to update the MCP Catalog console plugin, use the unified deployme
 ```
 
 The script automatically:
-- Builds the Backstage and console plugins
+- Builds the console plugin (or backstage if using --backstage-only)
 - Pushes the container image to your registry
 - Updates the OpenShift deployment
 - Restarts console pods for immediate effect
