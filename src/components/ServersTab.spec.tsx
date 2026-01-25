@@ -2,12 +2,13 @@ import * as React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ServersTab from './ServersTab';
-import { useCatalogEntities } from '../services/catalogService';
+import { useCatalogEntities, useServerTools } from '../services/catalogService';
 import { CatalogMcpServer } from '../models/CatalogMcpServer';
 
 // Mock the catalogService
 jest.mock('../services/catalogService', () => ({
   useCatalogEntities: jest.fn(),
+  useServerTools: jest.fn(),
 }));
 
 // Mock the performanceMonitor
@@ -16,6 +17,7 @@ jest.mock('../utils/performanceMonitor', () => ({
 }));
 
 const mockUseCatalogEntities = useCatalogEntities as jest.MockedFunction<typeof useCatalogEntities>;
+const mockUseServerTools = useServerTools as jest.MockedFunction<typeof useServerTools>;
 
 const mockServers: CatalogMcpServer[] = [
   {
@@ -62,6 +64,8 @@ const renderWithRouter = (component: React.ReactElement) => {
 describe('ServersTab', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Mock useServerTools to return empty state by default
+    mockUseServerTools.mockReturnValue([[], false, null]);
   });
 
   it('renders loading spinner when data is loading', () => {

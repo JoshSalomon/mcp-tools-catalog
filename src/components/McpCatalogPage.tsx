@@ -16,9 +16,8 @@ import {
   Flex,
   FlexItem,
 } from '@patternfly/react-core';
-import { ServerIcon, WrenchIcon, CubeIcon, ShieldAltIcon } from '@patternfly/react-icons';
+import { ServerIcon, CubeIcon, ShieldAltIcon } from '@patternfly/react-icons';
 import ServersTab from './ServersTab';
-import ToolsTab from './ToolsTab';
 import WorkloadsTab from './WorkloadsTab';
 import GuardrailsTab from './GuardrailsTab';
 import { ErrorBoundary } from './shared/ErrorBoundary';
@@ -33,8 +32,20 @@ const McpCatalogPage: React.FC = () => {
 
   // Get active tab and search from URL query parameters
   const searchParams = new URLSearchParams(location.search);
-  const activeTab = searchParams.get('type') || 'server';
+  const rawActiveTab = searchParams.get('type') || 'server';
   const urlSearch = searchParams.get('search') || '';
+
+  // Redirect legacy Tools tab URLs to Servers tab immediately
+  const activeTab = rawActiveTab === 'tool' ? 'server' : rawActiveTab;
+
+  React.useEffect(() => {
+    if (rawActiveTab === 'tool') {
+      const params = new URLSearchParams(location.search);
+      params.set('type', 'server');
+      // Use replace to avoid adding to history stack
+      history.replace(`/mcp-catalog?${params.toString()}`);
+    }
+  }, [rawActiveTab, location.search, history]);
 
   const [globalSearch, setGlobalSearch] = React.useState(urlSearch);
 
@@ -56,9 +67,8 @@ const McpCatalogPage: React.FC = () => {
   ) => {
     const tabMap: Record<string, string> = {
       '0': 'server',
-      '1': 'tool',
-      '2': 'workload',
-      '3': 'guardrail',
+      '1': 'workload',
+      '2': 'guardrail',
     };
     const tabName = tabMap[String(tabIndex)] || 'server';
     const params = new URLSearchParams();
@@ -73,19 +83,17 @@ const McpCatalogPage: React.FC = () => {
     switch (activeTab) {
       case 'server':
         return 0;
-      case 'tool':
-        return 1;
       case 'workload':
-        return 2;
+        return 1;
       case 'guardrail':
-        return 3;
+        return 2;
       default:
         return 0;
     }
   };
 
   // Quick filter to switch to a specific entity type
-  const handleTypeFilter = (type: 'server' | 'tool' | 'workload' | 'guardrail') => {
+  const handleTypeFilter = (type: 'server' | 'workload' | 'guardrail') => {
     const params = new URLSearchParams();
     params.set('type', type);
     if (globalSearch) {
@@ -139,19 +147,6 @@ const McpCatalogPage: React.FC = () => {
                     Servers
                   </Label>
                   <Label
-                    color={activeTab === 'tool' ? 'blue' : 'grey'}
-                    icon={<WrenchIcon />}
-                    onClick={() => handleTypeFilter('tool')}
-                    onKeyDown={(e) => e.key === 'Enter' && handleTypeFilter('tool')}
-                    style={{ cursor: 'pointer' }}
-                    tabIndex={0}
-                    role="button"
-                    aria-pressed={activeTab === 'tool'}
-                    aria-label="Filter by tools"
-                  >
-                    Tools
-                  </Label>
-                  <Label
                     color={activeTab === 'workload' ? 'blue' : 'grey'}
                     icon={<CubeIcon />}
                     onClick={() => handleTypeFilter('workload')}
@@ -198,21 +193,14 @@ const McpCatalogPage: React.FC = () => {
               </ErrorBoundary>
             </PageSection>
           </Tab>
-          <Tab eventKey={1} title={<TabTitleText>Tools</TabTitleText>}>
-            <PageSection>
-              <ErrorBoundary>
-                <ToolsTab initialSearch={globalSearch} />
-              </ErrorBoundary>
-            </PageSection>
-          </Tab>
-          <Tab eventKey={2} title={<TabTitleText>Workloads</TabTitleText>}>
+          <Tab eventKey={1} title={<TabTitleText>Workloads</TabTitleText>}>
             <PageSection>
               <ErrorBoundary>
                 <WorkloadsTab initialSearch={globalSearch} />
               </ErrorBoundary>
             </PageSection>
           </Tab>
-          <Tab eventKey={3} title={<TabTitleText>Guardrails</TabTitleText>}>
+          <Tab eventKey={2} title={<TabTitleText>Guardrails</TabTitleText>}>
             <PageSection>
               <ErrorBoundary>
                 <GuardrailsTab initialSearch={globalSearch} />

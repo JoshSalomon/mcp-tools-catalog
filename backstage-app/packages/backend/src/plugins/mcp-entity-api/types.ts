@@ -82,6 +82,10 @@ export interface MCPToolEntity {
   kind: 'Component';
   metadata: MCPEntityMetadata & { uid?: string };
   spec: MCPToolSpec;
+  /** Alternative description that overrides metadata.description when set (007-server-tools-view) */
+  alternativeDescription?: string;
+  /** Whether the tool is disabled */
+  disabled?: boolean;
 }
 
 // =============================================================================

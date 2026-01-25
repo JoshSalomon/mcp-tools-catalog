@@ -55,6 +55,7 @@ import {
   useGuardrails,
   attachGuardrailToTool,
   detachGuardrailFromTool,
+  updateToolAlternativeDescription,
 } from '../services/catalogService';
 import { getEntityName, formatToolName } from '../utils/hierarchicalNaming';
 import { validateServerReference } from '../services/validationService';
@@ -81,6 +82,12 @@ const McpToolPage: React.FC = () => {
 
   // Permission check for mcp-admin role
   const { canEdit: canManageGuardrails, loaded: authLoaded } = useCanEditCatalog();
+
+  // State for alternative description editing (T024-T026)
+  const [isEditingDescription, setIsEditingDescription] = React.useState(false);
+  const [descriptionEditValue, setDescriptionEditValue] = React.useState('');
+  const [descriptionSaveError, setDescriptionSaveError] = React.useState<string | null>(null);
+  const [isSavingDescription, setIsSavingDescription] = React.useState(false);
 
   // State for attach modal
   const [isAttachModalOpen, setIsAttachModalOpen] = React.useState(false);
@@ -120,7 +127,7 @@ const McpToolPage: React.FC = () => {
     CATALOG_MCP_TOOL_KIND,
     shouldFetch ? name : '__placeholder__',
     namespace,
-    location.key, // Simple cache key
+    `${location.key}-${refreshTrigger}`, // Include refreshTrigger to refetch after updates
     'tool', // Explicitly fetch from tools endpoint
   );
 
@@ -259,6 +266,56 @@ const McpToolPage: React.FC = () => {
       (g) => !attachedKeys.has(`${g.metadata.namespace}/${g.metadata.name}`),
     );
   }, [allGuardrails, toolGuardrails]);
+
+  // Handlers for alternative description editing (T024-T026)
+  const handleStartEditDescription = () => {
+    const currentDescription =
+      (tool as any)?.alternativeDescription || tool?.metadata.description || '';
+    setDescriptionEditValue(currentDescription);
+    setDescriptionSaveError(null);
+    setIsEditingDescription(true);
+  };
+
+  const handleCancelEditDescription = () => {
+    setIsEditingDescription(false);
+    setDescriptionEditValue('');
+    setDescriptionSaveError(null);
+  };
+
+  const handleSaveDescription = async () => {
+    setIsSavingDescription(true);
+    setDescriptionSaveError(null);
+
+    try {
+      // Trim whitespace and set to null if empty
+      const trimmedValue = descriptionEditValue.trim();
+      const valueToSave = trimmedValue.length > 0 ? trimmedValue : null;
+
+      await updateToolAlternativeDescription(namespace, name, valueToSave);
+
+      // Refresh the tool data
+      setRefreshTrigger((prev) => prev + 1);
+      setIsEditingDescription(false);
+    } catch (err) {
+      setDescriptionSaveError(
+        err instanceof Error ? err.message : 'Failed to save alternative description',
+      );
+    } finally {
+      setIsSavingDescription(false);
+    }
+  };
+
+  // Get display description: alternativeDescription if set, otherwise metadata.description
+  const displayDescription = React.useMemo(() => {
+    if (!tool) return '';
+    const altDesc = (tool as any)?.alternativeDescription;
+    return altDesc || tool.metadata.description || 'No description available';
+  }, [tool]);
+
+  // Check if alternative description is set
+  const hasAlternativeDescription = React.useMemo(() => {
+    return !!(tool && (tool as any)?.alternativeDescription);
+  }, [tool]);
 
   // Handlers for attach modal
   const handleOpenAttachModal = () => {
@@ -467,9 +524,90 @@ const McpToolPage: React.FC = () => {
                 </DescriptionListDescription>
               </DescriptionListGroup>
               <DescriptionListGroup>
-                <DescriptionListTerm>Description</DescriptionListTerm>
+                <DescriptionListTerm>
+                  <Flex
+                    alignItems={{ default: 'alignItemsCenter' }}
+                    spaceItems={{ default: 'spaceItemsSm' }}
+                  >
+                    <FlexItem>
+                      Description
+                      {hasAlternativeDescription && (
+                        <Label color="blue" style={{ marginLeft: '0.5rem' }} isCompact>
+                          Custom
+                        </Label>
+                      )}
+                    </FlexItem>
+                    {authLoaded && canManageGuardrails && !isEditingDescription && (
+                      <FlexItem>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={handleStartEditDescription}
+                          aria-label="Edit alternative description"
+                        >
+                          Edit
+                        </Button>
+                      </FlexItem>
+                    )}
+                  </Flex>
+                </DescriptionListTerm>
                 <DescriptionListDescription>
-                  {tool.metadata.description || 'No description available'}
+                  {isEditingDescription ? (
+                    <Form>
+                      <FormGroup fieldId="alternative-description-edit">
+                        <TextArea
+                          id="alternative-description-edit"
+                          value={descriptionEditValue}
+                          onChange={(_event, value) => setDescriptionEditValue(value)}
+                          rows={4}
+                          maxLength={2000}
+                          aria-label="Alternative description"
+                        />
+                        <div
+                          style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#6a6e73' }}
+                        >
+                          This description will override the catalog description. Leave empty to use
+                          the catalog description.
+                        </div>
+                        {descriptionSaveError && (
+                          <Alert
+                            variant="danger"
+                            isInline
+                            title={descriptionSaveError}
+                            style={{ marginTop: '0.5rem' }}
+                          />
+                        )}
+                        <Flex
+                          spaceItems={{ default: 'spaceItemsSm' }}
+                          style={{ marginTop: '0.5rem' }}
+                        >
+                          <FlexItem>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={handleSaveDescription}
+                              isDisabled={isSavingDescription}
+                              isLoading={isSavingDescription}
+                            >
+                              Save
+                            </Button>
+                          </FlexItem>
+                          <FlexItem>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              onClick={handleCancelEditDescription}
+                              isDisabled={isSavingDescription}
+                            >
+                              Cancel
+                            </Button>
+                          </FlexItem>
+                        </Flex>
+                      </FormGroup>
+                    </Form>
+                  ) : (
+                    displayDescription
+                  )}
                 </DescriptionListDescription>
               </DescriptionListGroup>
               <DescriptionListGroup>

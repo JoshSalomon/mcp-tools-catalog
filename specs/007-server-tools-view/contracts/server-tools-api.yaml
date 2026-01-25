@@ -1,0 +1,213 @@
+openapi: 3.0.3
+info:
+  title: MCP Server Tools API
+  description: API endpoints for server tools view consolidation feature
+  version: 1.0.0
+
+paths:
+  /servers/{namespace}/{name}/tools:
+    get:
+      summary: Get tools for a server
+      description: Returns all tools belonging to a server, sorted alphabetically by name (A-Z). Includes merged alternative descriptions from database.
+      operationId: getServerTools
+      tags:
+        - Servers
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Server namespace
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Server name
+      responses:
+        '200':
+          description: List of tools for the server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerToolsResponse'
+        '404':
+          description: Server not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tools/{namespace}/{name}/alternative-description:
+    put:
+      summary: Update tool alternative description
+      description: Sets or clears the alternative description for a tool. Requires mcp-admin role.
+      operationId: updateToolAlternativeDescription
+      tags:
+        - Tools
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Tool namespace
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Tool name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAlternativeDescriptionRequest'
+      responses:
+        '200':
+          description: Updated tool with alternative description
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPToolEntityWithAlternative'
+        '400':
+          description: Validation error (e.g., description too long)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not authorized (requires mcp-admin role)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tool not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ServerToolsResponse:
+      type: object
+      required:
+        - items
+        - totalCount
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MCPToolEntityWithAlternative'
+        totalCount:
+          type: integer
+          description: Total number of tools for this server
+
+    MCPToolEntityWithAlternative:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+          enum: ['backstage.io/v1alpha1']
+        kind:
+          type: string
+          enum: ['Component']
+        metadata:
+          $ref: '#/components/schemas/EntityMetadata'
+        spec:
+          $ref: '#/components/schemas/MCPToolSpec'
+        alternativeDescription:
+          type: string
+          nullable: true
+          maxLength: 2000
+          description: Optional override for the tool description
+        disabled:
+          type: boolean
+          description: Whether the tool is disabled
+
+    EntityMetadata:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        namespace:
+          type: string
+          default: 'default'
+        description:
+          type: string
+          description: Original description from catalog
+        title:
+          type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+
+    MCPToolSpec:
+      type: object
+      required:
+        - type
+        - lifecycle
+        - owner
+        - subcomponentOf
+      properties:
+        type:
+          type: string
+          enum: ['mcp-tool']
+        lifecycle:
+          type: string
+          enum: ['production', 'experimental', 'deprecated']
+        owner:
+          type: string
+        subcomponentOf:
+          type: string
+          description: Entity reference to parent server
+
+    UpdateAlternativeDescriptionRequest:
+      type: object
+      required:
+        - alternativeDescription
+      properties:
+        alternativeDescription:
+          type: string
+          maxLength: 2000
+          description: The alternative description to set. Empty string to clear.
+
+    Error:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        code:
+          type: string

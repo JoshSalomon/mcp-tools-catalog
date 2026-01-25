@@ -16,7 +16,7 @@ import {
   ConflictError,
   ValidationError,
 } from './errors';
-import { buildEntityRef, validator } from './validation';
+import { buildEntityRef, validator, validateAlternativeDescription } from './validation';
 import { MCPEntityDatabase } from './database';
 import { MCPEntityProvider } from './entityProvider';
 import type {
@@ -113,11 +113,33 @@ export class MCPEntityService {
     const entityRef = buildEntityRef('component', namespace, name);
     
     // Get entity from catalog (YAML source of truth)
-    const catalogEntity = await this.catalog.getEntityByRef({
-      kind: 'Component',
-      namespace,
-      name,
-    });
+    let catalogEntity: Entity | undefined;
+    try {
+      catalogEntity = await this.catalog.getEntityByRef({
+        kind: 'Component',
+        namespace,
+        name,
+      });
+    } catch (error: any) {
+      // Handle catalog service not ready (503) - retry once
+      if (error?.message?.includes('503') || error?.message?.includes('Service has not started up yet')) {
+        this.logger.warn('Catalog service not ready, retrying...', { namespace, name, error: error.message });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          catalogEntity = await this.catalog.getEntityByRef({
+            kind: 'Component',
+            namespace,
+            name,
+          });
+        } catch (retryError: any) {
+          this.logger.error('Catalog service still not ready after retry', { error: retryError.message });
+          throw new NotFoundError(entityRef);
+        }
+      } else {
+        // Re-throw other errors
+        throw error;
+      }
+    }
 
     if (!catalogEntity || (catalogEntity.spec as any)?.type !== 'mcp-server') {
       throw new NotFoundError(entityRef);
@@ -155,8 +177,29 @@ export class MCPEntityService {
       filter[0]['metadata.namespace'] = params.namespace;
     }
 
-    const response = await this.catalog.getEntities({ filter });
-    const catalogEntities = response.items;
+    let catalogEntities: Entity[] = [];
+    try {
+      const response = await this.catalog.getEntities({ filter });
+      catalogEntities = response.items;
+    } catch (error: any) {
+      // Handle catalog service not ready (503) - retry with exponential backoff
+      if (error?.message?.includes('503') || error?.message?.includes('Service has not started up yet')) {
+        this.logger.warn('Catalog service not ready, retrying...', { error: error.message });
+        // Retry once after a short delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          const retryResponse = await this.catalog.getEntities({ filter });
+          catalogEntities = retryResponse.items;
+          this.logger.info('Catalog service ready after retry', { count: catalogEntities.length });
+        } catch (retryError: any) {
+          this.logger.error('Catalog service still not ready after retry', { error: retryError.message });
+          return { items: [], totalCount: 0 };
+        }
+      } else {
+        // Re-throw other errors
+        throw error;
+      }
+    }
 
     // Merge database state into catalog entities
     const mergedEntities = await Promise.all(
@@ -319,34 +362,197 @@ export class MCPEntityService {
     const entityRef = buildEntityRef('component', namespace, name);
     
     // Get entity from catalog (YAML source of truth)
-    const catalogEntity = await this.catalog.getEntityByRef({
-      kind: 'Component',
-      namespace,
-      name,
-    });
+    let catalogEntity: Entity | undefined;
+    try {
+      catalogEntity = await this.catalog.getEntityByRef({
+        kind: 'Component',
+        namespace,
+        name,
+      });
+    } catch (error: any) {
+      // Handle catalog service not ready (503) - retry once
+      if (error?.message?.includes('503') || error?.message?.includes('Service has not started up yet')) {
+        this.logger.warn('Catalog service not ready, retrying...', { namespace, name, error: error.message });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          catalogEntity = await this.catalog.getEntityByRef({
+            kind: 'Component',
+            namespace,
+            name,
+          });
+        } catch (retryError: any) {
+          this.logger.error('Catalog service still not ready after retry', { error: retryError.message });
+          throw new NotFoundError(entityRef);
+        }
+      } else {
+        // Re-throw other errors
+        throw error;
+      }
+    }
 
     if (!catalogEntity || (catalogEntity.spec as any)?.type !== 'mcp-tool') {
       throw new NotFoundError(entityRef);
     }
 
-    // Get any database overrides (disabled state, etc.)
-    const dbEntity = await this.database.getEntity(entityRef);
-    
-    // Merge: catalog as base, database annotations overlay
-    if (dbEntity) {
-      return {
-        ...catalogEntity,
-        metadata: {
-          ...catalogEntity.metadata,
-          annotations: {
-            ...catalogEntity.metadata.annotations,
-            ...dbEntity.metadata.annotations, // Database wins for annotations
-          },
-        },
-      } as unknown as MCPToolEntity;
+    // Get database row for runtime state (disabled, alternativeDescription)
+    const dbRow = await this.database.getEntityRow(entityRef);
+
+    // Build merged response
+    const merged: any = {
+      ...catalogEntity,
+      metadata: {
+        ...catalogEntity.metadata,
+      },
+    };
+
+    // Merge database state if exists
+    if (dbRow) {
+      // Parse database entity for annotations (disabled state)
+      const dbEntity = JSON.parse(dbRow.entity_json);
+      if (dbEntity.metadata?.annotations) {
+        merged.metadata.annotations = {
+          ...catalogEntity.metadata.annotations,
+          ...dbEntity.metadata.annotations,
+        };
+      }
+
+      // Add alternativeDescription from database row (T019)
+      if (dbRow.alternative_description) {
+        merged.alternativeDescription = dbRow.alternative_description;
+      }
     }
 
-    return catalogEntity as unknown as MCPToolEntity;
+    return merged as unknown as MCPToolEntity;
+  }
+
+  /**
+   * Get all tools for a specific server, sorted alphabetically by name (A-Z).
+   * Used by the expandable server rows in the Servers tab (007-server-tools-view US1).
+   * Merges catalog entities with database state (runtime overrides including alternativeDescription).
+   */
+  async getToolsForServer(
+    serverNamespace: string,
+    serverName: string,
+  ): Promise<EntityListResponse<MCPToolEntity>> {
+    this.logger.debug('Getting tools for server', { serverNamespace, serverName });
+
+    // Verify server exists
+    const serverRef = buildEntityRef('component', serverNamespace, serverName);
+    let server: Entity | undefined;
+    try {
+      server = await this.catalog.getEntityByRef({
+        kind: 'Component',
+        namespace: serverNamespace,
+        name: serverName,
+      });
+    } catch (error: any) {
+      // Handle catalog service not ready (503) - retry once
+      if (error?.message?.includes('503') || error?.message?.includes('Service has not started up yet')) {
+        this.logger.warn('Catalog service not ready, retrying...', { 
+          serverNamespace, 
+          serverName, 
+          error: error.message 
+        });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          server = await this.catalog.getEntityByRef({
+            kind: 'Component',
+            namespace: serverNamespace,
+            name: serverName,
+          });
+        } catch (retryError: any) {
+          this.logger.error('Catalog service still not ready after retry', { error: retryError.message });
+          throw new NotFoundError(serverRef);
+        }
+      } else {
+        // Re-throw other errors
+        throw error;
+      }
+    }
+    if (!server || (server.spec as any)?.type !== 'mcp-server') {
+      throw new NotFoundError(serverRef);
+    }
+
+    // Fetch all tools that belong to this server
+    // Tools reference their parent server via spec.subcomponentOf
+    const parentRef = `component:${serverNamespace}/${serverName}`;
+    const filter: Record<string, string>[] = [
+      { kind: 'component', 'spec.type': 'mcp-tool', 'spec.subcomponentOf': parentRef },
+    ];
+
+    let catalogEntities: Entity[] = [];
+    try {
+      const response = await this.catalog.getEntities({ filter });
+      catalogEntities = response.items;
+    } catch (error: any) {
+      // Handle catalog service not ready (503) - retry with exponential backoff
+      if (error?.message?.includes('503') || error?.message?.includes('Service has not started up yet')) {
+        this.logger.warn('Catalog service not ready, retrying...', { 
+          serverNamespace, 
+          serverName, 
+          error: error.message 
+        });
+        // Retry once after a short delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          const retryResponse = await this.catalog.getEntities({ filter });
+          catalogEntities = retryResponse.items;
+          this.logger.info('Catalog service ready after retry', { count: catalogEntities.length });
+        } catch (retryError: any) {
+          this.logger.error('Catalog service still not ready after retry', { error: retryError.message });
+          return { items: [], totalCount: 0 };
+        }
+      } else {
+        // Re-throw other errors
+        throw error;
+      }
+    }
+
+    // Merge database state into catalog entities (disabled flags, alternativeDescription)
+    const mergedEntities = await Promise.all(
+      catalogEntities.map(async (catalogEntity) => {
+        const entityRef = buildEntityRef(
+          'component',
+          catalogEntity.metadata.namespace || 'default',
+          catalogEntity.metadata.name,
+        );
+        const dbRow = await this.database.getEntityRow(entityRef);
+
+        const merged: any = {
+          ...catalogEntity,
+          metadata: {
+            ...catalogEntity.metadata,
+          },
+        };
+
+        // Merge database annotations (disabled state)
+        if (dbRow) {
+          const dbEntity = JSON.parse(dbRow.entity_json);
+          if (dbEntity.metadata?.annotations) {
+            merged.metadata.annotations = {
+              ...catalogEntity.metadata.annotations,
+              ...dbEntity.metadata.annotations,
+            };
+          }
+          // Add alternativeDescription from database row
+          if (dbRow.alternative_description) {
+            merged.alternativeDescription = dbRow.alternative_description;
+          }
+        }
+
+        return merged;
+      }),
+    );
+
+    // Sort tools alphabetically by name (A-Z) - spec requirement
+    mergedEntities.sort((a, b) =>
+      a.metadata.name.localeCompare(b.metadata.name, undefined, { sensitivity: 'base' }),
+    );
+
+    return {
+      items: mergedEntities as unknown as MCPToolEntity[],
+      totalCount: mergedEntities.length,
+    };
   }
 
   /**
@@ -364,10 +570,31 @@ export class MCPEntityService {
       filter[0]['spec.subcomponentOf'] = params.server;
     }
 
-    const response = await this.catalog.getEntities({ filter });
-    const catalogEntities = response.items;
+    let catalogEntities: Entity[] = [];
+    try {
+      const response = await this.catalog.getEntities({ filter });
+      catalogEntities = response.items;
+    } catch (error: any) {
+      // Handle catalog service not ready (503) - retry with exponential backoff
+      if (error?.message?.includes('503') || error?.message?.includes('Service has not started up yet')) {
+        this.logger.warn('Catalog service not ready, retrying...', { error: error.message });
+        // Retry once after a short delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          const retryResponse = await this.catalog.getEntities({ filter });
+          catalogEntities = retryResponse.items;
+          this.logger.info('Catalog service ready after retry', { count: catalogEntities.length });
+        } catch (retryError: any) {
+          this.logger.error('Catalog service still not ready after retry', { error: retryError.message });
+          return { items: [], totalCount: 0 };
+        }
+      } else {
+        // Re-throw other errors
+        throw error;
+      }
+    }
 
-    // Merge database state into catalog entities
+    // Merge database state into catalog entities (T019 - alternativeDescription)
     const mergedEntities = await Promise.all(
       catalogEntities.map(async (catalogEntity) => {
         const entityRef = buildEntityRef(
@@ -375,21 +602,32 @@ export class MCPEntityService {
           catalogEntity.metadata.namespace || 'default',
           catalogEntity.metadata.name,
         );
-        const dbEntity = await this.database.getEntity(entityRef);
-        
-        if (dbEntity) {
-          return {
-            ...catalogEntity,
-            metadata: {
-              ...catalogEntity.metadata,
-              annotations: {
-                ...catalogEntity.metadata.annotations,
-                ...dbEntity.metadata.annotations,
-              },
-            },
-          };
+        const dbRow = await this.database.getEntityRow(entityRef);
+
+        const merged: any = {
+          ...catalogEntity,
+          metadata: {
+            ...catalogEntity.metadata,
+          },
+        };
+
+        if (dbRow) {
+          // Parse database entity for annotations (disabled state)
+          const dbEntity = JSON.parse(dbRow.entity_json);
+          if (dbEntity.metadata?.annotations) {
+            merged.metadata.annotations = {
+              ...catalogEntity.metadata.annotations,
+              ...dbEntity.metadata.annotations,
+            };
+          }
+
+          // Add alternativeDescription from database row (T019)
+          if (dbRow.alternative_description) {
+            merged.alternativeDescription = dbRow.alternative_description;
+          }
         }
-        return catalogEntity;
+
+        return merged;
       }),
     );
 
@@ -487,6 +725,46 @@ export class MCPEntityService {
     await this.entityProvider.removeEntity(entityRef);
 
     this.logger.info('Tool deleted (dependents orphaned)', { entityRef });
+  }
+
+  /**
+   * Update the alternative description for a tool (T018 - 007-server-tools-view)
+   * The alternative description is stored in the database and overrides the catalog description.
+   */
+  async updateToolAlternativeDescription(
+    namespace: string,
+    name: string,
+    description: string | null,
+  ): Promise<MCPToolEntity> {
+    this.logger.info('Updating tool alternative description', { namespace, name, hasDescription: !!description });
+
+    const entityRef = buildEntityRef('component', namespace, name);
+
+    // Verify the tool exists in the catalog (source of truth)
+    const catalogEntity = await this.catalog.getEntityByRef({
+      kind: 'Component',
+      namespace,
+      name,
+    });
+
+    if (!catalogEntity || (catalogEntity.spec as any)?.type !== 'mcp-tool') {
+      throw new NotFoundError(entityRef);
+    }
+
+    // Validate alternative description if provided
+    if (description !== null) {
+      const validatedDescription = validateAlternativeDescription(description);
+      description = validatedDescription;
+    }
+
+    // Set the alternative description in the database
+    const updated = await this.database.setAlternativeDescription(entityRef, description);
+    if (!updated) {
+      throw new NotFoundError(entityRef);
+    }
+
+    // Return the updated tool with merged data
+    return this.getTool(namespace, name);
   }
 
   // ===========================================================================
