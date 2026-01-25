@@ -36,6 +36,13 @@ backend:
       #   ca: # if you have a CA file and want to verify it you can uncomment this section
       #     $file: <file-path>/ca/server.crt
 
+integrations:
+  github:
+    - host: github.com
+      # GitHub token for accessing the repository (can be empty for public repos)
+      # Set via GITHUB_TOKEN environment variable if needed for private repos
+      token: ${GITHUB_TOKEN:-}
+
 auth:
   # Allow unauthenticated access (required for guest mode in production)
   externalAccess:
@@ -68,13 +75,40 @@ catalog:
       rules:
         - allow: [User, Group]
 
-    # MCP Tools Catalog entities from GitHub
+    # MCP Tools Catalog entities from GitHub (main branch)
     - type: url
-      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/001-mcp-tools-catalog/entities/test1-server.yaml
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/github-server.yaml
       rules:
         - allow: [Component]
-
     - type: url
-      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/001-mcp-tools-catalog/entities/test1-tools.yaml
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/github-tools.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/kubernetes-server.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/kubernetes-tools.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/test1-server.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/test1-tools.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/test1-workload.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/multi-server-workloads.yaml
+      rules:
+        - allow: [Component]
+    - type: url
+      target: https://raw.githubusercontent.com/JoshSalomon/mcp-tools-catalog/main/entities/sample-guardrails.yaml
       rules:
         - allow: [Component]

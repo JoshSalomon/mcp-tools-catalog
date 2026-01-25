@@ -19,6 +19,9 @@ data:
         listen              [::]:{{ .Values.plugin.port }} ssl;
         ssl_certificate     /var/cert/tls.crt;
         ssl_certificate_key /var/cert/tls.key;
-        root                /usr/share/nginx/html;
+        root                /opt/app-root/src;
+        location / {
+            try_files $uri $uri/ =404;
+        }
       }
     }
