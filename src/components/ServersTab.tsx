@@ -10,9 +10,10 @@ import {
   ToolbarContent,
   ToolbarItem,
   SearchInput,
+  Label,
 } from '@patternfly/react-core';
-import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { ServerIcon, SearchIcon } from '@patternfly/react-icons';
+import { Table, Thead, Tr, Th, Tbody, Td, ExpandableRowContent } from '@patternfly/react-table';
+import { ServerIcon, SearchIcon, BanIcon, ToolsIcon } from '@patternfly/react-icons';
 import { filterResources } from '../services/searchService';
 import { usePerformanceMonitor } from '../utils/performanceMonitor';
 import { Pagination } from './shared/Pagination';
@@ -21,18 +22,122 @@ import {
   CATALOG_MCP_SERVER_KIND,
   CATALOG_MCP_SERVER_TYPE,
 } from '../models/CatalogMcpServer';
-import { useCatalogEntities } from '../services/catalogService';
+import { CatalogMcpTool, MCP_TOOL_DISABLED_ANNOTATION } from '../models/CatalogMcpTool';
+import { useCatalogEntities, useServerTools } from '../services/catalogService';
 
 interface ServersTabProps {
   /** Initial search term from parent component */
   initialSearch?: string;
 }
 
+/**
+ * Component to render the expanded row content showing tools for a server.
+ * Fetches tools lazily when the row is expanded.
+ * (007-server-tools-view US1)
+ */
+const ServerToolsRow: React.FC<{
+  serverNamespace: string;
+  serverName: string;
+  isExpanded: boolean;
+}> = ({ serverNamespace, serverName, isExpanded }) => {
+  const history = useHistory();
+  // Only fetch when expanded (skip=true when not expanded)
+  const [tools, toolsLoaded, toolsError] = useServerTools(serverNamespace, serverName, !isExpanded);
+
+  if (!isExpanded) {
+    return null;
+  }
+
+  if (!toolsLoaded) {
+    return (
+      <Bullseye>
+        <Spinner size="md" />
+      </Bullseye>
+    );
+  }
+
+  if (toolsError) {
+    return (
+      <EmptyState variant="xs">
+        <EmptyStateBody>Error loading tools: {toolsError.message}</EmptyStateBody>
+      </EmptyState>
+    );
+  }
+
+  // T013: Empty state for servers with no tools
+  if (tools.length === 0) {
+    return (
+      <EmptyState variant="xs" icon={ToolsIcon}>
+        <EmptyStateBody>No tools available for this server</EmptyStateBody>
+      </EmptyState>
+    );
+  }
+
+  // T014: Tools are already sorted alphabetically (A-Z) by the backend
+  return (
+    <Table aria-label={`Tools for server ${serverName}`} variant="compact" borders={false}>
+      <Thead>
+        <Tr>
+          <Th>Tool Name</Th>
+          <Th>Description</Th>
+          <Th>Status</Th>
+        </Tr>
+      </Thead>
+      <Tbody>
+        {tools.map((tool: CatalogMcpTool) => {
+          const isDisabled =
+            tool.metadata.annotations?.[MCP_TOOL_DISABLED_ANNOTATION] === 'true' ||
+            (tool as any).disabled === true;
+
+          // Use alternativeDescription if set, otherwise use metadata.description
+          const description =
+            (tool as any).alternativeDescription || tool.metadata.description || '';
+
+          return (
+            <Tr key={`${tool.metadata.namespace}/${tool.metadata.name}`}>
+              <Td dataLabel="Tool Name">
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    history.push(
+                      `/mcp-catalog/tools/${tool.metadata.name}?namespace=${
+                        tool.metadata.namespace || 'default'
+                      }`,
+                    );
+                  }}
+                >
+                  {tool.metadata.name}
+                </a>
+              </Td>
+              <Td dataLabel="Description">
+                {description.length > 100 ? `${description.substring(0, 100)}...` : description}
+              </Td>
+              <Td dataLabel="Status">
+                {isDisabled ? (
+                  <Label color="red" icon={<BanIcon />}>
+                    Disabled
+                  </Label>
+                ) : (
+                  <Label color="green">Enabled</Label>
+                )}
+              </Td>
+            </Tr>
+          );
+        })}
+      </Tbody>
+    </Table>
+  );
+};
+
 const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
   const history = useHistory();
   const [searchTerm, setSearchTerm] = React.useState(initialSearch);
   const [page, setPage] = React.useState(1);
   const [perPage, setPerPage] = React.useState(100);
+
+  // T010: Expandable row state management - track which server rows are expanded
+  const [expandedServerIds, setExpandedServerIds] = React.useState<Set<string>>(new Set());
 
   // Sync with parent search term
   React.useEffect(() => {
@@ -88,6 +193,19 @@ const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
     setPage(1);
   };
 
+  // T011: Toggle expand/collapse for a server row
+  const toggleServerExpanded = (serverId: string) => {
+    setExpandedServerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(serverId)) {
+        next.delete(serverId);
+      } else {
+        next.add(serverId);
+      }
+      return next;
+    });
+  };
+
   if (!loaded) {
     return (
       <Bullseye>
@@ -108,6 +226,9 @@ const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
       </EmptyState>
     );
   }
+
+  // Column count for expandable row (expand toggle + 6 data columns)
+  const columnCount = 7;
 
   return (
     <>
@@ -155,6 +276,7 @@ const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
         <Table aria-label="MCP Servers Table" variant="compact">
           <Thead>
             <Tr>
+              <Th screenReaderText="Expand/Collapse" />
               <Th>Name</Th>
               <Th>Namespace</Th>
               <Th>Type</Th>
@@ -163,26 +285,37 @@ const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
               <Th>Tools</Th>
             </Tr>
           </Thead>
-          <Tbody>
-            {paginatedServers.map((server) => {
-              // Count tools based on 'hasPart' relations (standard Backstage pattern)
-              // Check both relations array and spec.hasPart
-              let toolCount = server.relations?.filter((r) => r.type === 'hasPart').length || 0;
+          {paginatedServers.map((server, rowIndex) => {
+            // Generate unique ID for this server row
+            const serverId =
+              server.metadata.uid ||
+              `${server.metadata.namespace || 'default'}/${server.metadata.name}`;
+            const isExpanded = expandedServerIds.has(serverId);
 
-              // Also check spec.hasPart if relations are not populated yet
-              if (toolCount === 0 && server.spec.hasPart) {
-                const hasPart = Array.isArray(server.spec.hasPart)
-                  ? server.spec.hasPart
-                  : [server.spec.hasPart];
-                toolCount = hasPart.length;
-              }
+            // Count tools based on 'hasPart' relations (standard Backstage pattern)
+            // Check both relations array and spec.hasPart
+            let toolCount = server.relations?.filter((r) => r.type === 'hasPart').length || 0;
 
-              return (
-                <Tr
-                  key={
-                    server.metadata.uid || `${server.metadata.namespace}/${server.metadata.name}`
-                  }
-                >
+            // Also check spec.hasPart if relations are not populated yet
+            if (toolCount === 0 && server.spec.hasPart) {
+              const hasPart = Array.isArray(server.spec.hasPart)
+                ? server.spec.hasPart
+                : [server.spec.hasPart];
+              toolCount = hasPart.length;
+            }
+
+            return (
+              <Tbody key={serverId} isExpanded={isExpanded}>
+                {/* T011: Server row with expand control */}
+                <Tr>
+                  <Td
+                    expand={{
+                      rowIndex,
+                      isExpanded,
+                      onToggle: () => toggleServerExpanded(serverId),
+                      expandId: `expand-${serverId}`,
+                    }}
+                  />
                   <Td dataLabel="Name">
                     <a
                       href="#"
@@ -204,9 +337,21 @@ const ServersTab: React.FC<ServersTabProps> = ({ initialSearch = '' }) => {
                   <Td dataLabel="Owner">{server.spec.owner}</Td>
                   <Td dataLabel="Tools">{toolCount}</Td>
                 </Tr>
-              );
-            })}
-          </Tbody>
+                {/* T012: Expanded row content showing tools */}
+                <Tr isExpanded={isExpanded}>
+                  <Td colSpan={columnCount}>
+                    <ExpandableRowContent>
+                      <ServerToolsRow
+                        serverNamespace={server.metadata.namespace || 'default'}
+                        serverName={server.metadata.name}
+                        isExpanded={isExpanded}
+                      />
+                    </ExpandableRowContent>
+                  </Td>
+                </Tr>
+              </Tbody>
+            );
+          })}
         </Table>
       )}
     </>

@@ -538,6 +538,155 @@ export const useCatalogEntity = <T extends Entity>(
 };
 
 /**
+ * Update the alternative description for a tool (T023 - 007-server-tools-view).
+ * The alternative description is stored in the database and overrides the catalog description.
+ *
+ * @param namespace - Tool namespace
+ * @param name - Tool name
+ * @param description - Alternative description (max 2000 chars, null/empty to clear)
+ * @returns Promise resolving to the updated tool entity
+ * @throws Error if update fails (including 400 for validation, 403 for missing permissions, 404 if tool not found)
+ *
+ * @example
+ * ```typescript
+ * // Set alternative description
+ * const updated = await updateToolAlternativeDescription('default', 'k8s-list-pods', 'Lists pods in a namespace');
+ *
+ * // Clear alternative description (revert to catalog description)
+ * const reverted = await updateToolAlternativeDescription('default', 'k8s-list-pods', null);
+ * ```
+ */
+export const updateToolAlternativeDescription = async (
+  namespace: string,
+  name: string,
+  description: string | null,
+): Promise<CatalogMcpTool> => {
+  const url = new URL(
+    `${MCP_ENTITY_API_ENDPOINT}/tools/${namespace}/${name}/alternative-description`,
+    window.location.origin,
+  );
+
+  const headers = createAuthHeaders();
+  headers['Content-Type'] = 'application/json';
+
+  const response = await fetch(url.toString(), {
+    method: 'PUT',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify({ alternativeDescription: description }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error(
+      errorData.message || `Failed to update tool alternative description: ${response.statusText}`,
+    );
+  }
+
+  return response.json();
+};
+
+/**
+ * React hook for fetching tools belonging to a specific server.
+ * Tools are returned sorted alphabetically by name (A-Z).
+ * (007-server-tools-view US1)
+ *
+ * @param namespace - Server namespace
+ * @param name - Server name
+ * @param skip - If true, skip fetching (useful for conditional fetching)
+ * @returns Tuple of [tools array, loaded boolean, error or null]
+ *
+ * @example
+ * ```tsx
+ * // Only fetch when server is expanded
+ * const [tools, loaded, error] = useServerTools('default', 'my-server', !isExpanded);
+ * ```
+ */
+export const useServerTools = (
+  namespace: string,
+  name: string,
+  skip = false,
+): [CatalogMcpTool[], boolean, Error | null] => {
+  const [data, setData] = useState<CatalogMcpTool[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    // Skip fetching if skip is true or if name is invalid
+    if (skip || !name || name === '__placeholder__' || name.startsWith('__')) {
+      if (mounted) {
+        setData([]);
+        setLoaded(true);
+      }
+      return;
+    }
+
+    // Reset state on refetch
+    setData([]);
+    setLoaded(false);
+    setError(null);
+
+    const fetchData = async () => {
+      try {
+        const url = new URL(
+          `${MCP_ENTITY_API_ENDPOINT}/servers/${namespace}/${name}/tools`,
+          window.location.origin,
+        );
+
+        const headers: Record<string, string> = {
+          Accept: 'application/json',
+        };
+
+        const response = await fetch(url.toString(), {
+          headers,
+          credentials: 'include',
+        });
+
+        if (response.status === 404) {
+          // Server not found - return empty array
+          if (mounted) {
+            setData([]);
+            setLoaded(true);
+          }
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch server tools: ${response.statusText} (${response.status})`,
+          );
+        }
+
+        const json = await response.json();
+        // API returns { items: [...], totalCount: number }
+        const tools = Array.isArray(json) ? json : json.items || [];
+
+        if (mounted) {
+          setData(tools as CatalogMcpTool[]);
+          setLoaded(true);
+        }
+      } catch (err) {
+        if (mounted) {
+          console.error('Error fetching server tools:', err);
+          setError(err instanceof Error ? err : new Error(String(err)));
+          setLoaded(true);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      mounted = false;
+    };
+  }, [namespace, name, skip]);
+
+  return [data, loaded, error];
+};
+
+/**
  * Batch update tool disabled states.
  * Updates multiple tools' disabled annotations in a single batch operation.
  *

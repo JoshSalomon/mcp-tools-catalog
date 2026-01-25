@@ -86,16 +86,6 @@
   {
     "type": "console.navigation/href",
     "properties": {
-      "id": "mcp-tools-list",
-      "name": "Tools",
-      "href": "/mcp-catalog?type=tool",
-      "perspective": "admin",
-      "section": "mcp-tools"
-    }
-  },
-  {
-    "type": "console.navigation/href",
-    "properties": {
       "id": "mcp-workloads",
       "name": "Workloads",
       "href": "/mcp-catalog?type=workload",

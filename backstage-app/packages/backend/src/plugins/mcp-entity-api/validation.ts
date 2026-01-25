@@ -365,3 +365,44 @@ export function parseEntityRef(ref: string): {
 
 // Singleton instance
 export const validator: MCPEntityValidator = new MCPEntityValidator();
+
+// =============================================================================
+// Alternative Description Validation (007-server-tools-view)
+// =============================================================================
+
+const MAX_ALTERNATIVE_DESCRIPTION_LENGTH = 2000;
+
+/**
+ * Validate and normalize alternative description input.
+ * - Trims whitespace
+ * - Treats whitespace-only as empty (returns null)
+ * - Validates max length (2000 chars)
+ *
+ * @param description - The alternative description input
+ * @returns Normalized description string or null if empty/whitespace
+ * @throws ValidationError if description exceeds max length
+ */
+export function validateAlternativeDescription(
+  description: string | null | undefined,
+): string | null {
+  if (description === null || description === undefined) {
+    return null;
+  }
+
+  // Trim whitespace
+  const trimmed = description.trim();
+
+  // Treat whitespace-only as empty
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  // Validate max length
+  if (trimmed.length > MAX_ALTERNATIVE_DESCRIPTION_LENGTH) {
+    throw new ValidationError(
+      `Alternative description must not exceed ${MAX_ALTERNATIVE_DESCRIPTION_LENGTH} characters`,
+    );
+  }
+
+  return trimmed;
+}

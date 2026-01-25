@@ -61,6 +61,17 @@ export interface CatalogMcpTool extends Entity {
     /** Allow additional properties */
     [key: string]: any;
   };
+  /**
+   * Alternative description that overrides metadata.description when set.
+   * Stored in database, merged with catalog entity at query time.
+   * @since 007-server-tools-view
+   */
+  alternativeDescription?: string;
+  /**
+   * Whether the tool is disabled.
+   * Merged from database at query time.
+   */
+  disabled?: boolean;
 }
 
 /**

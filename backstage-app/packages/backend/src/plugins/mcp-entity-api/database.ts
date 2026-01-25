@@ -26,6 +26,7 @@ export interface MCPEntityRow {
   entity_json: string;
   created_at: Date;
   updated_at: Date;
+  alternative_description: string | null; // 007-server-tools-view: optional override description
 }
 
 export interface MCPGuardrailRow {
@@ -108,6 +109,16 @@ export class MCPEntityDatabase {
         table.index(['namespace', 'name']);
       });
       this.logger.info('Created mcp_entities table');
+    }
+
+    // Migration: Add alternative_description column if it doesn't exist (007-server-tools-view)
+    const hasAltDescColumn = await this.db.schema.hasColumn(TABLE_NAME, 'alternative_description');
+    if (!hasAltDescColumn) {
+      this.logger.info('Adding alternative_description column to mcp_entities table');
+      await this.db.schema.alterTable(TABLE_NAME, table => {
+        table.text('alternative_description').nullable();
+      });
+      this.logger.info('Added alternative_description column to mcp_entities table');
     }
 
     // Guardrails table migration
@@ -277,6 +288,19 @@ export class MCPEntityDatabase {
   }
 
   /**
+   * Get the raw database row for an entity.
+   * Use this when you need access to database-specific fields like alternative_description.
+   * (007-server-tools-view)
+   */
+  async getEntityRow(entityRef: string): Promise<MCPEntityRow | undefined> {
+    const row = await this.db<MCPEntityRow>(TABLE_NAME)
+      .where({ entity_ref: entityRef })
+      .first();
+
+    return row;
+  }
+
+  /**
    * Get an entity by namespace and name
    */
   async getEntityByName(
@@ -402,6 +426,103 @@ export class MCPEntityDatabase {
   async getAllEntities(): Promise<Entity[]> {
     const rows = await this.db<MCPEntityRow>(TABLE_NAME).select('entity_json');
     return rows.map(row => JSON.parse(row.entity_json) as Entity);
+  }
+
+  // ===========================================================================
+  // Alternative Description Operations (007-server-tools-view)
+  // ===========================================================================
+
+  /**
+   * Get the alternative description for an entity by entity reference.
+   * T016: Returns null if no alternative description is set.
+   */
+  async getAlternativeDescription(entityRef: string): Promise<string | null> {
+    const row = await this.db<MCPEntityRow>(TABLE_NAME)
+      .where({ entity_ref: entityRef })
+      .select('alternative_description')
+      .first();
+
+    return row?.alternative_description || null;
+  }
+
+  /**
+   * Set the alternative description for an entity by entity reference.
+   * T017: Trims whitespace and sets to null if empty.
+   */
+  async setAlternativeDescription(entityRef: string, description: string | null): Promise<boolean> {
+    let processedDescription: string | null = null;
+
+    if (description !== null) {
+      const trimmed = description.trim();
+      if (trimmed.length > 0) {
+        processedDescription = trimmed;
+      }
+    }
+
+    // Check if row exists
+    const existing = await this.db<MCPEntityRow>(TABLE_NAME)
+      .where({ entity_ref: entityRef })
+      .first();
+
+    if (existing) {
+      // Update existing row
+      const updated = await this.db<MCPEntityRow>(TABLE_NAME)
+        .where({ entity_ref: entityRef })
+        .update({
+          alternative_description: processedDescription,
+          updated_at: new Date(),
+        });
+
+      if (updated > 0) {
+        this.logger.info('Alternative description updated', {
+          entityRef,
+          hasDescription: processedDescription !== null
+        });
+        return true;
+      }
+      return false;
+    } else {
+      // Create new row for YAML-defined entity (merge architecture pattern)
+      // Parse entityRef to get kind, namespace, name
+      const parts = entityRef.split(':');
+      const kind = parts[0] || 'component';
+      const nameParts = parts[1]?.split('/') || [];
+      const namespace = nameParts[0] || 'default';
+      const name = nameParts[1] || '';
+
+      // Create minimal entity row with just alternative_description
+      // The entity_json will be minimal since this is a YAML entity
+      const now = new Date();
+      const minimalEntity = {
+        apiVersion: 'backstage.io/v1alpha1',
+        kind: kind === 'component' ? 'Component' : kind,
+        metadata: {
+          name,
+          namespace,
+        },
+        spec: {
+          type: 'mcp-tool', // Will be overridden by catalog merge
+        },
+      };
+
+      await this.db<MCPEntityRow>(TABLE_NAME).insert({
+        id: `mcp-tool-${namespace}-${name}`,
+        entity_ref: entityRef,
+        entity_type: 'mcp-tool',
+        namespace,
+        name,
+        entity_json: JSON.stringify(minimalEntity),
+        alternative_description: processedDescription,
+        created_at: now,
+        updated_at: now,
+      });
+
+      this.logger.info('Alternative description created for YAML entity', {
+        entityRef,
+        hasDescription: processedDescription !== null
+      });
+      return true;
+    }
   }
 
   // ===========================================================================

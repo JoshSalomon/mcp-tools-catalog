@@ -431,6 +431,55 @@ export async function createRouter(
     }),
   );
 
+  /**
+   * @openapi
+   * /api/mcp-entity-api/servers/{namespace}/{name}/tools:
+   *   get:
+   *     summary: Get all tools for a server
+   *     description: |
+   *       Returns all MCP Tools belonging to a server, sorted alphabetically by name (A-Z).
+   *       Includes merged alternativeDescription from database if set.
+   *       (007-server-tools-view US1)
+   *     tags: [Servers]
+   *     parameters:
+   *       - in: path
+   *         name: namespace
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: name
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: List of tools for the server
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 items:
+   *                   type: array
+   *                   items:
+   *                     $ref: '#/components/schemas/MCPToolEntity'
+   *                 totalCount:
+   *                   type: integer
+   *       404:
+   *         description: Server not found
+   */
+  // GET /servers/:namespace/:name/tools - Get all tools for a server (007-server-tools-view T008)
+  // No RBAC required - public read
+  router.get(
+    '/servers/:namespace/:name/tools',
+    asyncHandler(async (req, res) => {
+      const { namespace, name } = req.params;
+      const result = await service.getToolsForServer(namespace, name);
+      sendSuccessResponse(res, result);
+    }),
+  );
+
   // PUT /servers/:namespace/:name - Update a server (T021, T038)
   // Requires mcp-admin role per FR-005
   // Note: Validation handled by Backstage catalog when entity is saved
@@ -549,6 +598,78 @@ export async function createRouter(
       const { namespace, name } = req.params;
       await service.deleteTool(namespace, name);
       sendNoContentResponse(res);
+    }),
+  );
+
+  /**
+   * @openapi
+   * /api/mcp-entity-api/tools/{namespace}/{name}/alternative-description:
+   *   put:
+   *     summary: Update alternative description for a tool (007-server-tools-view)
+   *     description: Set or update the alternative description that overrides the catalog description
+   *     tags: [Tools]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: namespace
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Tool namespace
+   *       - in: path
+   *         name: name
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Tool name
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               alternativeDescription:
+   *                 type: string
+   *                 description: Alternative description (max 2000 chars, null/empty to clear)
+   *                 maxLength: 2000
+   *             required: [alternativeDescription]
+   *     responses:
+   *       200:
+   *         description: Tool updated successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/MCPToolEntity'
+   *       400:
+   *         description: Validation error (description too long)
+   *       401:
+   *         description: Authentication required
+   *       403:
+   *         description: User lacks mcp-admin role
+   *       404:
+   *         description: Tool not found
+   */
+  // PUT /tools/:namespace/:name/alternative-description - Update tool alternative description (T020)
+  // Requires mcp-admin role per design requirements
+  router.put(
+    '/tools/:namespace/:name/alternative-description',
+    rbac('mcp-tool', 'update'),
+    asyncHandler(async (req, res) => {
+      const { namespace, name } = req.params;
+      const { alternativeDescription } = req.body;
+
+      if (typeof alternativeDescription !== 'string' && alternativeDescription !== null) {
+        throw new ValidationError('alternativeDescription must be a string or null');
+      }
+
+      const result = await service.updateToolAlternativeDescription(
+        namespace,
+        name,
+        alternativeDescription,
+      );
+      sendSuccessResponse(res, result);
     }),
   );
 
